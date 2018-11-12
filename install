@@ -1,0 +1,108 @@
+#!/bin/bash
+
+REQ_PYV="3.4"
+PYTHON_URI="https://www.python.org/ftp/python/3.7.1/Python-3.7.1.tgz"
+# TODO: add verbosity
+echo "
+    Copyright (C) 2018 Daniel Montgomery
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details."
+
+echo
+echo -e "Do you want to install codediff dependecies and utilities? [y/N]\c  "
+read install
+
+if [[ ! $(fgrep -ix "$install" <<< "y" ) ]]; then
+    echo "Exiting installation script."
+    exit 0
+fi
+
+echo
+
+function cleanup { # $1 - tmpfile $2 - tmpdir
+    # TODO: make calling this easier. Passing args is error prone and annoying.
+    # cleanup temp files
+    if [ -f $1 ]; then
+	rm -rf $1
+    fi
+    if [ -d $2 ]; then
+	rm -rf $2
+    fi
+}
+
+function install_python_source {
+    echo -e "Would you like to try to download and install Python 3.7.1 from source? Requires make. [y/N]\c "
+    # TODO get python version from uri
+    read ipython
+
+    if [[ $(grep -ix "$ipython" <<< "y") ]]; then
+        tmpfile=$(mktemp -u)
+        tmpdir=$(mktemp -d) # MACOS might require a template for `mkdir`. See manpages.
+        echo
+        echo "Downloading python source code..."
+        # TODO: maybe use curl
+        wget $PYTHON_URI -q --show-progress -O $tmpfile
+        echo "Decompressing..."
+        # tar removes tmpfile
+        tar -C $tmpdir --strip-components=1 -xzf $tmpfile
+        if make_loc="$(command -v make 2>&1)" && [[ -n $make_loc ]]; then
+            if gcc_loc="$(command -v gcc 2>&1)" && [[ -n $gcc_loc ]]; then
+                pushd $tmpdir >dev/null
+                echo "Found $(make -v | head -1) and $(gcc --version | head -n 1). Configuring, compiling, and installing."
+                echo
+                echo "------------------------ [ CONFIGURING ] ------------------------"
+                echo
+                ./configure 2>&1 || { echo "\nCofiguring failed. Aborting install and cleaning up."; cleanup $tmpfile $tmpdir; popd >/dev/null; exit 1; }
+                echo
+                echo "------------------------ [ COMPILING ] ------------------------"
+                echo
+                make 2>&1 || { echo "\nCompile failed. Aborting install and cleaning up."; cleanup $tmpfile $tmpdir; popd >/dev/null; exit 1; }
+                echo
+                echo "------------------------ [ TESTING ] ------------------------"
+                echo
+                make test 2>&1 || { echo "\nTesting failed. Aborting install and cleaning up."; cleanup $tmpfile $tmpdir; popd >/dev/null; exit 1; }
+                echo
+                echo "------------------------ [ INSTALLING ] ------------------------"
+                echo
+                sudo make install 2>&1 || { echo "\Installing failed. Aborting install and cleaning up."; cleanup $tmpfile $tmpdir; popd >/dev/null; exit 1; }
+                popd >/dev/null
+            else
+                echo "Cannot find gcc. Aborting install and cleaning up."
+                cleanup $tmpfile $tmpdir
+                exit 1
+            fi
+        else
+            echo "Cannot find make. Aborting install and cleaning up."
+            cleanup $tmpfile $tmpdir
+            exit 1
+        fi
+    fi
+}
+
+# Check if they have the required version of python3. If they do not, try to build in from source.
+# TODO: make the conditional into a function.
+if python_loc="$(command -v python3 2>&1)" && [[ -n $python_loc ]]; then
+    if [ $(python3 -V 2>&1 | sed "s/.* \([0-9]\).\([0-9]\).*/\1\2/") -ge  ${REQ_PYV/./} ]; then
+        # Good to go
+        echo "Your $(python3 -V 2>&1) distribution ($(command -v python3)) is up to date."
+    else
+        # python3 exists, needs updating
+        echo "Found $(python3 -V 2>&1) at $(command -v python3), but codediff requires at least Python $REQ_PYV."
+        # TODO first try to install for apt if on debian
+        install_python_source
+    fi
+else
+    # Cannot find python3, install
+    echo "Cannot find python3 in \$PATH."
+    install_python_source
+fi
+
+echo "All dependencies installed, you can now run CodeDiff!"

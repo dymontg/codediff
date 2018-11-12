@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+""" CodeDiff - A file differencer for use in APCS(P) classes.
+    Copyright (C) 2018 Daniel Montgomery
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+"""
+
+__version__ = '0.0.1'
+
+__author__ = 'Daniel Montgomery'
+__copyright__ = 'Copyright (C) 2018 Daniel Montgomery'
+__credits__ = ['Daniel Montgomery', 'Cole Mediratta', 'Blake Sanie']
+__license__ = 'GPLv3'
+
+import argparse
+import sys
+from src.parser import SnapXmlParser
+from src.utils import FileError, FileIOError
+
+class LicenseAction(argparse.Action):
+    def __init__(self, option_strings, dest=argparse.SUPPRESS, default=argparse.SUPPRESS, help='Show CodeDiff\'s license and exit.'):
+        super(LicenseAction, self).__init__(option_strings=option_strings, dest=dest, default=default, nargs=0, help=help)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        # formatter = parser._get_formatter()
+        with open('LICENSE', 'r') as cdlicense:
+            for line in cdlicense:
+                print(line[:-1])
+                # TODO use parser formatting.
+                #formatter.add_text(str(line[:-1]))
+#        parser._print_message(formatter.format_help(), sys.stdout)
+        parser.exit()
+
+if __name__ == '__main__':
+    argparser = argparse.ArgumentParser(prog='CodeDiff', description='A file differencer for use in APCS(P) classes.',
+                                        epilog='''
+                                        \tCodeDiff  Copyright (C)  2018  Daniel Montgomery
+                                        \tThis program comes with ABSOLUTELY NO WARRANTY;
+                                        \tThis is free software, and you are welcome to redistribute it
+                                        \tunder certain conditions; type `--license` for details.
+                                        '''
+                                       ) # TODO fix epilog formatting
+    argparser.add_argument('input_files', nargs='+', help='input files for CodeDiff. Can be files and/or directories.')
+    argparser.add_argument('-V', '--version', action='version', version='CodeDiff v' + __version__)
+    argparser.add_argument('-l', '--license', action=LicenseAction)
+    verbose_group = argparser.add_mutually_exclusive_group()
+    verbose_group.add_argument('-q', '--quiet', help='Only output results', action='store_true')
+    verbose_group.add_argument('-v', '--verbose', help='increase output verbosity', action='store_true')
+    args = argparser.parse_args()
+    # TODO make verbosity and quiet work.
+    try:
+        snap_parser = SnapXmlParser(args.input_files)
+        ratios = snap_parser.ratios()
+        # formatter = argparser._get_formatter()
+        for path, path2 in ratios:
+            ratio = ratios[path, path2]
+            print('Compared {} and {}: {}% similar'.format(path, path2, "{0:.2f}".format(float(ratio)*100)))
+            # TODO use parser formatting.
+            # formatter.add_text(str(line[:-1]))
+            # argparser._print_message(formatter.format_help(), sys.stdout)
+    except (FileError, FileIOError) as e:
+        argparser.error(str(e))
