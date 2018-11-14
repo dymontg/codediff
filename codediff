@@ -20,14 +20,19 @@ __copyright__ = 'Copyright (C) 2018 Daniel Montgomery'
 __credits__ = ['Daniel Montgomery', 'Cole Mediratta', 'Blake Sanie']
 __license__ = 'GPLv3'
 
-import argparse
-import sys
+import argparse, logging, sys
 from src.parser import SnapXmlParser
 from src.utils import FileError, FileIOError
 
 class LicenseAction(argparse.Action):
-    def __init__(self, option_strings, dest=argparse.SUPPRESS, default=argparse.SUPPRESS, help='Show CodeDiff\'s license and exit.'):
-        super(LicenseAction, self).__init__(option_strings=option_strings, dest=dest, default=default, nargs=0, help=help)
+    def __init__(self, option_strings, dest=argparse.SUPPRESS,
+                 default=argparse.SUPPRESS,
+                 help='Show CodeDiff\'s license and exit.'):
+        super(LicenseAction, self).__init__(option_strings=option_strings,
+                                            dest=dest,
+                                            default=default,
+                                            nargs=0,
+                                            help=help)
 
     def __call__(self, parser, namespace, values, option_string=None):
         # formatter = parser._get_formatter()
@@ -40,7 +45,9 @@ class LicenseAction(argparse.Action):
         parser.exit()
 
 if __name__ == '__main__':
-    argparser = argparse.ArgumentParser(prog='CodeDiff', description='A file differencer for use in APCS(P) classes.',
+    # Initalize argparser
+    argparser = argparse.ArgumentParser(prog='CodeDiff',
+                                        description='A file differencer for use in APCS(P) classes.',
                                         epilog='''
                                         \tCodeDiff  Copyright (C)  2018  Daniel Montgomery
                                         \tThis program comes with ABSOLUTELY NO WARRANTY;
@@ -48,23 +55,45 @@ if __name__ == '__main__':
                                         \tunder certain conditions; type `--license` for details.
                                         '''
                                        ) # TODO fix epilog formatting
-    argparser.add_argument('input_files', nargs='+', help='input files for CodeDiff. Can be files and/or directories.')
+    argparser.add_argument('input_files', nargs='+',
+                           help='input files for CodeDiff. Can be files and/or directories.')
     argparser.add_argument('-V', '--version', action='version', version='CodeDiff v' + __version__)
     argparser.add_argument('-l', '--license', action=LicenseAction)
     verbose_group = argparser.add_mutually_exclusive_group()
-    verbose_group.add_argument('-q', '--quiet', help='Only output results', action='store_true')
-    verbose_group.add_argument('-v', '--verbose', help='increase output verbosity', action='store_true')
+    verbose_group.add_argument('-q', '--quiet', help='Only output results.',
+                               action='store_const', dest='log_level', const=logging.ERROR)
+    # Currently, verbosity does nothing.
+    verbose_group.add_argument('-v', '--verbose',
+                           help='increase output verbosity',
+                           action='store_const', dest='log_level', const=logging.INFO)
+    # TODO ensure that the lowest log level is passed when using `-v`, `-q` and `-d`
+    argparser.add_argument('-d', '--debug', help='Print debug statements for developers.',
+                           action='store_const', dest='log_level', const=logging.DEBUG)
     args = argparser.parse_args()
-    # TODO make verbosity and quiet work.
+
+    # Setup verbose and logging facilities
+    logger = logging.getLogger('codediff')
+    logger.setLevel(logging.DEBUG) # Have to set logger to the handler's lowest logging level
+    stdout_handler = logging.StreamHandler(stream=sys.stdout) # Logging handler for debug and verbosity
+    stdout_handler.setLevel(args.log_level or logging.INFO) # only show errors if they don't enable debugging
+    stdout_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
+    logger.addHandler(stdout_handler)
+
+    # Run the program
     try:
+        logger.debug('Creating SnapXmlParser instance...')
         snap_parser = SnapXmlParser(args.input_files)
+        logger.debug('Computing ratios...')
         ratios = snap_parser.ratios()
         # formatter = argparser._get_formatter()
         for path, path2 in ratios:
             ratio = ratios[path, path2]
-            print('Compared {} and {}: {}% similar'.format(path, path2, "{0:.2f}".format(float(ratio)*100)))
-            # TODO use parser formatting.
+            print('Compared {} and {}: {}% similar'.format(path, path2, round(float(ratio)*100, 1)))
+            # TODO use parser formatting
             # formatter.add_text(str(line[:-1]))
             # argparser._print_message(formatter.format_help(), sys.stdout)
+
     except (FileError, FileIOError) as e:
         argparser.error(str(e))
+    except Exception as e:
+        logger.exception('Oh noes! :( An exception has occured.')
