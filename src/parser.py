@@ -40,14 +40,13 @@ class XmlParser:
 
     def ratios(self):
         self.diff_ratios = dict()
-        # TODO: this is terribly slow. Add threading.
         for i, path in enumerate(self.paths):
             with open(path, 'r') as xml:
-                for j in range(i+1, len(self.paths)):
-                    path2 = self.paths[j]
+                xml.seek(0)
+                for path2 in self.paths[i+1:]:
                     with open(path2, 'r') as xml2:
                         seq_match = difflib.SequenceMatcher(lambda x: x in " \t", xml.read(), xml2.read())
-                        ratio = seq_match.ratio()
+                        ratio = seq_match.quick_ratio()
                         self.diff_ratios[path, path2] = ratio
 
         return self.diff_ratios
