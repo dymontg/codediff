@@ -42,8 +42,8 @@ class XmlParser:
         self.diff_ratios = dict()
         for i, path in enumerate(self.paths):
             with open(path, 'r') as xml:
-                xml.seek(0)
                 for path2 in self.paths[i+1:]:
+                    xml.seek(0)
                     with open(path2, 'r') as xml2:
                         seq_match = difflib.SequenceMatcher(lambda x: x in " \t", xml.read(), xml2.read())
                         ratio = seq_match.quick_ratio()
