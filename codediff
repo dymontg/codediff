@@ -20,8 +20,9 @@ __copyright__ = 'Copyright (C) 2018 Daniel Montgomery'
 __credits__ = ['Daniel Montgomery', 'Cole Mediratta', 'Blake Sanie']
 __license__ = 'GPLv3'
 
-import argparse, logging, sys
+import argparse, sys, logging
 from src.parser import SnapXmlParser
+from src import logger
 from src.utils import FileError, FileIOError
 
 class LicenseAction(argparse.Action):
@@ -71,19 +72,14 @@ if __name__ == '__main__':
                            action='store_const', dest='log_level', const=logging.DEBUG)
     args = argparser.parse_args()
 
-    # Setup verbose and logging facilities
-    logger = logging.getLogger('codediff')
-    logger.setLevel(logging.DEBUG) # Have to set logger to the handler's lowest logging level
-    stdout_handler = logging.StreamHandler(stream=sys.stdout) # Logging handler for debug and verbosity
-    stdout_handler.setLevel(args.log_level or logging.INFO) # only show errors if they don't enable debugging
-    stdout_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
-    logger.addHandler(stdout_handler)
+    # Init verbose and logging facilities
+    _logger = logger.init_logger(args.log_level or logging.INFO)
 
     # Run the program
     try:
-        logger.debug('Creating SnapXmlParser instance...')
+        _logger.debug('Creating SnapXmlParser instance...')
         snap_parser = SnapXmlParser(args.input_files)
-        logger.debug('Computing ratios...')
+        _logger.debug('Computing ratios...')
         ratios = snap_parser.ratios()
         # formatter = argparser._get_formatter()
         for path, path2 in ratios:
@@ -96,4 +92,4 @@ if __name__ == '__main__':
     except (FileError, FileIOError) as e:
         argparser.error(str(e))
     except Exception as e:
-        logger.exception('Oh noes! :( An exception has occured.')
+        _logger.exception('Oh noes! :( An exception has occured.')
