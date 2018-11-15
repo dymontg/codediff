@@ -11,6 +11,7 @@ _logger = logging.getLogger('codediff')
 
 class XmlParser:
     def __init__(self, path):
+        _logger.debug('========== BEGIN `%s::%s::__init__` ==========', __name__, self.__class__.__name__)
         _logger.debug('Instantiating `XmlParser` with argument `path`: %s', path)
         self.paths = []
         if type(path) is list:
@@ -19,8 +20,10 @@ class XmlParser:
         if type(path) is str:
             _logger.debug('`path` is of type str, coberting to list and validating paths')
             self._validate_paths([path])
+        _logger.debug('========== END `%s::%s::__init__` ==========', __name__, self.__class__.__name__)
 
     def _validate_paths(self, paths):
+        _logger.debug('========== BEGIN `%s::%s::_validate_paths` ==========', __name__, self.__class__.__name__)
         _logger.debug('Validating paths %s', paths)
         for path in paths:
             if os.path.isfile(path):
@@ -42,13 +45,17 @@ class XmlParser:
 
         if len(self.paths) < 2:
             raise NotEnoughFilesError('Expecting at least two xml files but found less than two.')
+        _logger.debug('========== END `%s::%s::_validate_paths` ==========', __name__, self.__class__.__name__)
 
     def _validate_file(self, path):
+        _logger.debug('========== BEGIN `%s::%s::_validate_file` ==========', __name__, self.__class__.__name__)
         _logger.debug('Validating %s has `.xml` extension', path)
         if not path.endswith('.xml'):
             raise UnsupportedFiletypeError('{} is not an supported xml file type. Aborting.'.format(path))
+        _logger.debug('========== END `%s::%s::_validate_file` ==========', __name__, self.__class__.__name__)
 
-    def ratios(self):
+    def ratios(self):        
+        _logger.debug('========== BEGIN `%s::%s::ratios` ==========', __name__, self.__class__.__name__)
         self.diff_ratios = dict()
         _logger.debug('Finding similarity ratio between all files')
         for i, path in enumerate(self.paths):
@@ -59,15 +66,17 @@ class XmlParser:
                     with open(path2, 'r') as xml2:
                         _logger.debug('Opened %s, j=%i, i=%i', path2, j, i)
                         seq_match = difflib.SequenceMatcher(lambda x: x in " \t", xml.read(), xml2.read())
-                        _logger.info('Comparing %s and %s.......', path, path2)
+                        _logger.info('Comparing %s and %s.......', path, path2, extra={'terminator': ''})
                         ratio = seq_match.quick_ratio()
                         _logger.info('DONE')
                         self.diff_ratios[path, path2] = ratio
 
+        _logger.debug('========== END `%s::%s::ratios` ==========', __name__, self.__class__.__name__)
         return self.diff_ratios
 
 class SnapXmlParser(XmlParser):
     def _validate_file(self, path):
+        _logger.debug('========== BEGIN `%s::%s::_validate_file` ==========', __name__, self.__class__.__name__)
         _REGEX_LITERAL = re.compile(r'^<project name=".*?" app=".*? http:\/\/snap.berkeley.edu" version=".*?">')
         super(SnapXmlParser, self)._validate_file(path)
         _logger.debug('Validating %s is a snap file', path)
@@ -79,3 +88,4 @@ class SnapXmlParser(XmlParser):
             if re.match(_REGEX_LITERAL, snap_xml.read(4096)) is None:
                 # Tests if the regex does not match the first 4096 bytes.
                 raise UnsupportedFiletypeError('{} is not a supported snap xml. Aborting.'.format(path))
+        _logger.debug('========== END `%s::%s::_validate_file` ==========', __name__, self.__class__.__name__)

@@ -25,7 +25,8 @@ def lineify_xml(path, encoding='utf-8'):
     :param path: path to file as a string.
     :return: None.
     """
-    logging.debug('========== BEGIN ` %s::lineify_xml` ==========', __name__)
+    _logger = logging.getLogger('codediff')
+    _logger.debug('========== BEGIN ` %s::lineify_xml` ==========', __name__)
     _REGEX_LITERAL = r'><'
     logging.debug('Lineifying xml file %s with encoding %s', path, encoding)
     with open(path, 'rb+') as xml:
@@ -49,4 +50,4 @@ def lineify_xml(path, encoding='utf-8'):
             xml.write(bytes(content, encoding))
             current_tell = xml.tell()
             content = xml.read(_BLOCK_SIZE).decode(encoding)'''
-    logging.debug('========== END `%s::lineify_xml` ==========', __name__)
+    _logger.debug('========== END `%s::lineify_xml` ==========', __name__)
