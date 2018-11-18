@@ -20,9 +20,11 @@ __copyright__ = 'Copyright (C) 2018 Daniel Montgomery'
 __credits__ = ['Daniel Montgomery', 'Cole Mediratta', 'Blake Sanie']
 __license__ = 'GPLv3'
 
-import argparse, sys, logging
-from src.parser import SnapXmlParser
+import argparse, logging
 from src import logger
+from src.parser import PathParser
+from src.matcher import snapcompare
+from src.validators import SnapPathValidator
 from src.utils import FileError, FileIOError
 
 class LicenseAction(argparse.Action):
@@ -78,17 +80,10 @@ if __name__ == '__main__':
     # Run the program
     try:
         _logger.debug('Creating SnapXmlParser instance...')
-        snap_parser = SnapXmlParser(args.input_files)
+        parsed_paths = PathParser(args.input_files, SnapPathValidator()).parse()
         _logger.debug('Computing ratios...')
-        ratios = snap_parser.ratios()
-        # formatter = argparser._get_formatter()
-        for path, path2 in ratios:
-            ratio = ratios[path, path2]
-            print('Compared {} and {}: {}% similar'.format(path, path2, round(float(ratio)*100, 1)))
-            # TODO use parser formatting
-            # formatter.add_text(str(line[:-1]))
-            # argparser._print_message(formatter.format_help(), sys.stdout)
-
+        ratios = snapcompare(parsed_paths)
+        _logger.debug('Found following ratios: %s', ratios)
     except (FileError, FileIOError) as e:
         argparser.error(str(e))
     except Exception as e:
