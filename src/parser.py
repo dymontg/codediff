@@ -57,28 +57,25 @@ class XmlParser:
     def ratios(self):
         _logger.debug('========== BEGIN `%s::%s::ratios` ==========', __name__, self.__class__.__name__)
         self.diff_ratios = dict()
-        total = int((len(self.paths)**2-len(self.paths))/2)
-        c = 0
+        total_files = (len(self.paths)**2-len(self.paths))//2
         _logger.debug('Finding similarity ratio between all files')
         for i, path in enumerate(self.paths):
             with open(path, 'r') as xml:
                 _logger.debug('Opened %s, i=%i', path, i)
-                for j in range(i+1, len(self.paths)):
-                    path2 = self.paths[j]
+                for j, path2 in enumerate(self.paths[i+1:]):
                     with open(path2, 'r') as xml2:
                         _logger.debug('Opened %s, j=%i, i=%i', path2, j, i)
                         seq_match = difflib.SequenceMatcher(lambda x: x in " \t", xml.read(), xml2.read())
+                        sys.stdout.write('\rCompared {}% ({}/{})'.format((j+i*total_files/2)*100//total_files, j+i*total_files//2, total_files))
+                        sys.stdout.flush()
                         _logger.debug('Comparing %s and %s.......', path, path2, extra={'terminator': ''})
                         ratio = seq_match.ratio()
-                        c+=1
                         xml.seek(0)
                         _logger.debug('DONE')
-                        sys.stdout.write("\r%d%%" % int(c*100/total)) #comment this line and the one below out for optimal debug results
-                        sys.stdout.flush()
                         self.diff_ratios[path, path2] = ratio
 
         _logger.debug('========== END `%s::%s::ratios` ==========', __name__, self.__class__.__name__)
-        print(total)
+        sys.stdout.write('\n')
         return self.diff_ratios
 
 class SnapXmlParser(XmlParser):
