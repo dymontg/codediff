@@ -28,14 +28,14 @@ def lineify_xml(path, encoding='utf-8'):
     _logger = logging.getLogger('codediff')
     _logger.debug('========== BEGIN ` %s::lineify_xml` ==========', __name__)
     _REGEX_LITERAL = r'><'
-    logging.debug('Lineifying xml file %s with encoding %s', path, encoding)
+    logging.debug('Lineifying xml file %s with encoding %s.', path, encoding)
     with open(path, 'rb+') as xml:
         # Currently, we read the whole file into memory.
-        # We could also has an ifile and ofile, with filename `filename.lineified.xml`
-        # Could check for changes using a hash
+        # We could also has an ifile and ofile, with filename `filename.lineified.xml`.
+        # Could check for changes using a hash.
         logging.debug('Subsituting %s with >\\n<', _REGEX_LITERAL)
         content = re.sub(_REGEX_LITERAL, r'>\n<', xml.read().decode(encoding), flags=re.M)
-        logging.debug('Seeking 0th byte, truncating, and writing substitued content')
+        logging.debug('Seeking 0th byte, truncating, and writing substitued content.')
         xml.seek(0)
         xml.truncate()
         xml.write(bytes(content, encoding))
