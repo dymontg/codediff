@@ -3,6 +3,7 @@
 """
 import re
 import os
+import sys
 import logging
 import difflib
 from src.utils import UnsupportedFiletypeError, NotEnoughFilesError, Pair

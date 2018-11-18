@@ -83,7 +83,7 @@ if __name__ == '__main__':
         _logger.debug('Computing ratios...')
         ratios = snap_parser.ratios()
         # formatter = argparser._get_formatter()
-        for path_pair, ratio in sdv(ratios, reverse=True):
+        for path_pair, ratio in sdv(ratios):
             print('Compared {} and {}: {}% similar'.format(path_pair[0], path_pair[1],
                                                            round(float(ratio)*100, 1)))
         # TODO use parser formatting.
