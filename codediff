@@ -97,4 +97,4 @@ if __name__ == '__main__':
     except (FileError, FileIOError) as e:
         argparser.error(str(e))
     except Exception as e:
-        _logger.exception('Oh noes! :( An exception has occuered.')
+        _logger.exception('Oh noes! :( An exception has occurred.')
