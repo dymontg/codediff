@@ -4,7 +4,7 @@
 
 import re, os, logging
 import difflib
-from src.utils import UnsupportedFiletypeError, NotEnoughFilesError
+from src.utils import UnsupportedFiletypeError, NotEnoughFilesError, Pair
 
 
 _logger = logging.getLogger('codediff')
@@ -69,7 +69,7 @@ class XmlParser:
                         _logger.info('Comparing %s and %s.......', path, path2, extra={'terminator': ''})
                         ratio = seq_match.quick_ratio()
                         _logger.info('DONE')
-                        self.diff_ratios[path, path2] = ratio
+                        self.diff_ratios[Pair(path, path2)] = ratio
 
         _logger.debug('========== END `%s::%s::ratios` ==========', __name__, self.__class__.__name__)
         return self.diff_ratios
