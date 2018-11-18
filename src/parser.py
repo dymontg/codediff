@@ -2,7 +2,7 @@
     See codediff executable for copyright disclaimer.
 """
 
-import re, os, logging
+import re, os, logging, sys
 import difflib
 from src.utils import UnsupportedFiletypeError, NotEnoughFilesError
 
@@ -54,9 +54,11 @@ class XmlParser:
             raise UnsupportedFiletypeError('{} is not an supported xml file type. Aborting.'.format(path))
         _logger.debug('========== END `%s::%s::_validate_file` ==========', __name__, self.__class__.__name__)
 
-    def ratios(self):        
+    def ratios(self):
         _logger.debug('========== BEGIN `%s::%s::ratios` ==========', __name__, self.__class__.__name__)
         self.diff_ratios = dict()
+        total = int((len(self.paths)**2-len(self.paths))/2)
+        c = 0
         _logger.debug('Finding similarity ratio between all files')
         for i, path in enumerate(self.paths):
             with open(path, 'r') as xml:
@@ -66,12 +68,17 @@ class XmlParser:
                     with open(path2, 'r') as xml2:
                         _logger.debug('Opened %s, j=%i, i=%i', path2, j, i)
                         seq_match = difflib.SequenceMatcher(lambda x: x in " \t", xml.read(), xml2.read())
-                        _logger.info('Comparing %s and %s.......', path, path2, extra={'terminator': ''})
-                        ratio = seq_match.quick_ratio()
-                        _logger.info('DONE')
+                        _logger.debug('Comparing %s and %s.......', path, path2, extra={'terminator': ''})
+                        ratio = seq_match.ratio()
+                        c+=1
+                        xml.seek(0)
+                        _logger.debug('DONE')
+                        sys.stdout.write("\r%d%%" % int(c*100/total)) #comment this line and the one below out for optimal debug results
+                        sys.stdout.flush()
                         self.diff_ratios[path, path2] = ratio
 
         _logger.debug('========== END `%s::%s::ratios` ==========', __name__, self.__class__.__name__)
+        print(total)
         return self.diff_ratios
 
 class SnapXmlParser(XmlParser):
