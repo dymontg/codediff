@@ -47,7 +47,7 @@ class LicenseAction(argparse.Action):
         parser.exit()
 
 if __name__ == '__main__':
-    # Initalize argparser
+    # Initalizes argparser
     argparser = argparse.ArgumentParser(prog='CodeDiff',
                                         description='A file differencer for use in APCS(P) classes.',
                                         epilog='''
@@ -73,10 +73,10 @@ if __name__ == '__main__':
                            action='store_const', dest='log_level', const=logging.DEBUG)
     args = argparser.parse_args()
 
-    # Init verbose and logging facilities
+    # Init verbose and logging facilities.
     _logger = logger.init_logger(args.log_level or logging.INFO)
 
-    # Run the program
+    # Run the program.
     try:
         _logger.debug('Creating SnapXmlParser instance...')
         snap_parser = SnapXmlParser(args.input_files)
@@ -89,7 +89,7 @@ if __name__ == '__main__':
         printable = sort(sortable)
         for p in printable:
             print('Compared {} and {}: {}% similar'.format(p[0], p[1], round(float(p[2])*100, 1)))
-        # TODO use parser formatting
+        # TODO use parser formatting.
         # formatter.add_text(str(line[:-1]))
         # argparser._print_message(formatter.format_help(), sys.stdout)
 

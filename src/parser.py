@@ -12,13 +12,13 @@ _logger = logging.getLogger('codediff')
 class XmlParser:
     def __init__(self, path):
         _logger.debug('========== BEGIN `%s::%s::__init__` ==========', __name__, self.__class__.__name__)
-        _logger.debug('Instantiating `XmlParser` with argument `path`: %s', path)
+        _logger.debug('Instantiating `XmlParser` with argument `path`: %s.', path)
         self.paths = []
         if type(path) is list:
-            _logger.debug('`path` is of type list, validating paths')
+            _logger.debug('`path` is of type list, validating paths.')
             self._validate_paths(path)
         if type(path) is str:
-            _logger.debug('`path` is of type str, coberting to list and validating paths')
+            _logger.debug('`path` is of type str, coberting to list and validating paths.')
             self._validate_paths([path])
         _logger.debug('========== END `%s::%s::__init__` ==========', __name__, self.__class__.__name__)
 
@@ -32,7 +32,7 @@ class XmlParser:
                 self.paths.append(path)
             elif os.path.isdir(path):
                 _logger.debug('%s is a directory', path)
-                path = path.rstrip('/') # Will only work on unix, use os.path.normalpath for windows
+                path = path.rstrip('/') # Will only work on unix, use os.path.normalpath for windows.
                 filename_paths = [root + '/' + x for root, _, files_list in os.walk(path) for x in files_list]
                 xml_filename_paths = [x for x in filename_paths if x.endswith('.xml')]
                 _logger.debug('Found %s in `%s`', filename_paths, path)
@@ -44,7 +44,7 @@ class XmlParser:
                 raise FileNotFoundError('Could not find file {}. Aborting.'.format(path))
 
         if len(self.paths) < 2:
-            raise NotEnoughFilesError('Expecting at least two xml files but found less than two.')
+            raise NotEnoughFilesError('Expecting at least two xml files, but found less than two.')
         _logger.debug('========== END `%s::%s::_validate_paths` ==========', __name__, self.__class__.__name__)
 
     def _validate_file(self, path):
@@ -58,7 +58,7 @@ class XmlParser:
         _logger.debug('========== BEGIN `%s::%s::ratios` ==========', __name__, self.__class__.__name__)
         self.diff_ratios = dict()
         total_files = (len(self.paths)**2-len(self.paths))//2
-        _logger.debug('Finding similarity ratio between all files')
+        _logger.debug('Finding similarity ratio between all files.')
         for i, path in enumerate(self.paths):
             with open(path, 'r') as xml:
                 _logger.debug('Opened %s, i=%i', path, i)
@@ -86,10 +86,10 @@ class SnapXmlParser(XmlParser):
         _logger.debug('Validating %s is a snap file', path)
 
         with open(path, 'r') as snap_xml:
-            # Only read the first 4096 bytes, as the project directive should be at the top of the file.
-            # (Let's hope their project name is not massive!)
+            # Only read the first 4096 bytes as the project directive should be near the top of the file.
+            # (Let's hope their project name is not gigantic!)
             _logger.debug('Opened %s, reading first 4096 bytes', path)
             if re.match(_REGEX_LITERAL, snap_xml.read(4096)) is None:
                 # Tests if the regex does not match the first 4096 bytes.
-                raise UnsupportedFiletypeError('{} is not a supported snap xml. Aborting.'.format(path))
+                raise UnsupportedFiletypeError('{} is not a supported snap file. Aborting.'.format(path))
         _logger.debug('========== END `%s::%s::_validate_file` ==========', __name__, self.__class__.__name__)
