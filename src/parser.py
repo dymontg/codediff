@@ -1,10 +1,12 @@
 """ CodeDiff - A file differencer for use in APCS(P) classes.
     See codediff executable for copyright disclaimer.
 """
-
-import re, os, logging, sys
+import re
+import os
+import sys
+import logging
 import difflib
-from src.utils import UnsupportedFiletypeError, NotEnoughFilesError
+from src.utils import UnsupportedFiletypeError, NotEnoughFilesError, Pair
 
 
 _logger = logging.getLogger('codediff')
@@ -72,7 +74,7 @@ class XmlParser:
                         ratio = seq_match.ratio()
                         xml.seek(0)
                         _logger.debug('DONE')
-                        self.diff_ratios[path, path2] = ratio
+                        self.diff_ratios[Pair(path, path2)] = ratio
 
         _logger.debug('========== END `%s::%s::ratios` ==========', __name__, self.__class__.__name__)
         sys.stdout.write('\n')

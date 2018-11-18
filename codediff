@@ -20,11 +20,11 @@ __copyright__ = 'Copyright (C) 2018 Daniel Montgomery'
 __credits__ = ['Daniel Montgomery', 'Cole Mediratta', 'Blake Sanie']
 __license__ = 'GPLv3'
 
-import argparse, sys, logging
+import argparse
+import logging
 from src.parser import SnapXmlParser
 from src import logger
-from src.utils import FileError, FileIOError
-from src.sorter import sort
+from src.utils import FileError, FileIOError, sdv
 
 class LicenseAction(argparse.Action):
     def __init__(self, option_strings, dest=argparse.SUPPRESS,
@@ -83,12 +83,9 @@ if __name__ == '__main__':
         _logger.debug('Computing ratios...')
         ratios = snap_parser.ratios()
         # formatter = argparser._get_formatter()
-        sortable = []
-        for path, path2 in ratios:
-            sortable.append([path, path2, ratios[path, path2]])
-        printable = sort(sortable)
-        for p in printable:
-            print('Compared {} and {}: {}% similar'.format(p[0], p[1], round(float(p[2])*100, 1)))
+        for path_pair, ratio in sdv(ratios):
+            print('Compared {} and {}: {}% similar'.format(path_pair[0], path_pair[1],
+                                                           round(float(ratio)*100, 1)))
         # TODO use parser formatting.
         # formatter.add_text(str(line[:-1]))
         # argparser._print_message(formatter.format_help(), sys.stdout)

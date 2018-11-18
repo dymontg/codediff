@@ -1,4 +1,8 @@
-import logging, sys
+""" CodeDiff - A file differencer for use in APCS(P) classes.
+    See codediff executable for copyright disclaimer.
+"""
+import logging
+import sys
 
 def init_logger(log_level):
     _logger = logging.getLogger('codediff')
