@@ -1,4 +1,4 @@
-def sort(array):
+def sort(array): #SimpleSort for the results to be cleaner.
     less = []
     equal = []
     greater = []
