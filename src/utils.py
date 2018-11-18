@@ -1,7 +1,8 @@
 """ CodeDiff - A file differencer for use in APCS(P) classes.
     See codediff executable for copyright disclaimer.
 """
-import re, logging
+import re
+import logging
 
 
 class FileError(Exception):

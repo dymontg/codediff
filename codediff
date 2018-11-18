@@ -20,7 +20,8 @@ __copyright__ = 'Copyright (C) 2018 Daniel Montgomery'
 __credits__ = ['Daniel Montgomery', 'Cole Mediratta', 'Blake Sanie']
 __license__ = 'GPLv3'
 
-import argparse, sys, logging
+import argparse
+import logging
 from src.parser import SnapXmlParser
 from src import logger
 from src.utils import FileError, FileIOError, sdv
