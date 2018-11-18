@@ -85,7 +85,6 @@ if __name__ == '__main__':
         # formatter = argparser._get_formatter()
         sortable = []
         for path, path2 in ratios:
-            print(path, path2)
             sortable.append([path, path2, ratios[path, path2]])
         printable = sort(sortable)
         for p in printable:
