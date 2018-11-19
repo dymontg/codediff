@@ -105,4 +105,4 @@ else
     install_python_source
 fi
 
-echo "All dependencies installed, you can now run CodeDiff!"
+echo "All dependencies installed, you can now run codediff!"
