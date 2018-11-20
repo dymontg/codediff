@@ -22,6 +22,8 @@ __license__ = 'GPLv3'
 
 import argparse
 import logging
+import sys
+import textwrap
 from src.parser import SnapXmlParser
 from src import logger
 from src.utils import FileError, FileIOError, sdv
@@ -37,29 +39,31 @@ class LicenseAction(argparse.Action):
                                             help=help)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        # formatter = parser._get_formatter()
-        with open('LICENSE', 'r') as cdlicense:
-            for line in cdlicense:
-                print(line[:-1])
-                # TODO use parser formatting.
-                #formatter.add_text(str(line[:-1]))
-#        parser._print_message(formatter.format_help(), sys.stdout)
-        parser.exit()
+        try:
+            with open('LICENSE', 'r') as cdlicense:
+                for line in cdlicense:
+                    # We can't use logger here because it is yet to be defined
+                    parser._print_message(line, sys.stdout)
+        except FileNotFoundError:
+            parser._print_message('Couldn\'t find LICENSE, but you can still ', sys.stdout)
+            parser._print_message('read it here: https://www.gnu.org/licenses/gpl-3.0.txt\n', sys.stdout)
+        finally:
+            parser.exit()
 
 if __name__ == '__main__':
     # Initalizes argparser
-    argparser = argparse.ArgumentParser(prog='CodeDiff',
+    argparser = argparse.ArgumentParser(prog='codediff',
                                         description='A file differencer for use in APCS(P) classes.',
-                                        epilog='''
-                                        \tCodeDiff  Copyright (C)  2018  Daniel Montgomery
-                                        \tThis program comes with ABSOLUTELY NO WARRANTY;
-                                        \tThis is free software, and you are welcome to redistribute it
-                                        \tunder certain conditions; type `--license` for details.
-                                        '''
-                                       ) # TODO fix epilog formatting
+                                        formatter_class=argparse.RawDescriptionHelpFormatter,
+                                        epilog=textwrap.indent(textwrap.dedent('''\
+                                        codediff  Copyright (C)  2018  Daniel Montgomery
+                                        This program comes with ABSOLUTELY NO WARRANTY;
+                                        This is free software, and you are welcome to redistribute it
+                                        under certain conditions; type `--license` for details.
+                                        '''), 4 * ' '))
     argparser.add_argument('input_files', nargs='+',
-                           help='input files for CodeDiff. Can be files and/or directories.')
-    argparser.add_argument('-V', '--version', action='version', version='CodeDiff v' + __version__)
+                           help='input files for codediff. Can be files and/or directories.')
+    argparser.add_argument('-V', '--version', action='version', version='codediff v' + __version__)
     argparser.add_argument('-l', '--license', action=LicenseAction)
     verbose_group = argparser.add_mutually_exclusive_group()
     verbose_group.add_argument('-q', '--quiet', help='Only output results.',
