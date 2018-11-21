@@ -8,6 +8,7 @@ REQ_PYV="3.4"
 PYTHON_URI="https://www.python.org/ftp/python/3.7.1/Python-3.7.1.tgz"
 TMPFILE=$(mktemp -u)
 TMPDIR=$(mktemp -d) # MacOS might require a template for `mkdir`. See manpages.
+VERBOSE=0
 
 ####################################
 # Helper functions
@@ -72,15 +73,24 @@ function install_python_source {
     : '''Installs python from source.
     '''
     if ask_yn "Would you like to try to download and install Python 3.7.1 from source? Requires make."; then
+
         echo
         echo "Downloading python source code..."
 
-        # TODO: maybe use curl
-        wget $PYTHON_URI -q --show-progress -O $TMPFILE
-
+        # Download the source code using curl or wget. If none are found,
+        # exit peacefully.
+        if cmd_exists curl; then
+            curl --progress-bar $PYTHON_URI -o $TMPFILE
+        elif cmd_exists wget; then
+            wget $PYTHON_URI -q --show-progress -O $TMPFILE
+        else
+            echo "Cannot find wget or curl in \$PATH: cannot download python3."
+            exit_peacefully 1
+        fi
 
         echo "Decompressing..."
-        # tar removes tmpfile
+        # Untar the archive
+        # tar removes the temp file
         tar -C $TMPDIR --strip-components=1 -xzf $TMPFILE
 
         if cmd_exists make; then
