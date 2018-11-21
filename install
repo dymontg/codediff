@@ -4,11 +4,19 @@
 # Global variables
 ####################################
 
+# The next three statements ensures bash handles errors more like a programming language.
+set -o pipefail # trace pipe errors
+set -o nounset # set -u: exit script if unising unitialized variables
+set -o errexit # set -e: exit script on error
+
 REQ_PYV="3.4"
 PYTHON_URI="https://www.python.org/ftp/python/3.7.1/Python-3.7.1.tgz"
 TMPFILE=$(mktemp -u)
 TMPDIR=$(mktemp -d) # MacOS might require a template for `mkdir`. See manpages.
-VERBOSE=0
+VERBOSE=1 # false
+
+# cleanup temp files in case of untimely exit.
+trap "cleanup_tmp" EXIT
 
 ####################################
 # Helper functions
@@ -31,17 +39,6 @@ function ask_yn {
         return 0
     fi
     return 1
-}
-
-function exit_peacefully {
-    : '''Exits the script peacefully with an error code.
-
-    :param code - $1 (optional): The code to exit with. Defaults to 0.
-    '''
-    # Set $code equal to the first argument or 0.
-    local code=${1:=0}
-    cleanup_tmp
-    exit $code
 }
 
 function cleanup_tmp {
@@ -69,6 +66,17 @@ function cmd_exists {
     return 1
 }
 
+function verbose {
+    : '''Redirects stdout to /dev/null if $VERBOSE is false (0).
+    '''
+    if [[ $VERBOSE -eq 0 ]]; then
+        "$@"
+    else
+        # Only redirect stdout to /dev/null (don't redirect stderr).
+        "$@" 1>/dev/null
+    fi
+}
+
 function install_python_source {
     : '''Installs python from source.
     '''
@@ -85,7 +93,7 @@ function install_python_source {
             wget $PYTHON_URI -q --show-progress -O $TMPFILE
         else
             echo "Cannot find wget or curl in \$PATH: cannot download python3."
-            exit_peacefully 1
+            exit 127
         fi
 
         echo "Decompressing..."
@@ -95,37 +103,58 @@ function install_python_source {
 
         if cmd_exists make; then
             if cmd_exists gcc; then
-                pushd $TMPDIR >/dev/null
+                # We presumably have everything we need to build and install python.
+                pushd $TMPDIR 1>/dev/null
                 echo "Found $(make -v | head -1) and $(gcc --version | head -n 1). Configuring, compiling, and installing."
                 echo
-                echo "------------------------ [ CONFIGURING ] ------------------------"
+                echo "CONFIGURING..."
                 echo
-                ./configure 2>&1 || { echo "\nCofiguring failed. Aborting install and cleaning up."; popd >/dev/null; exit_peacefully 1; }
+                verbose ./configure 2>&1 || { echo -e "\nCofiguring failed. Aborting install and cleaning up."; popd >/dev/null; exit 1; }
                 echo
-                echo "------------------------ [ COMPILING ] ------------------------"
+                echo "COMPILING... (this will take a while)"
                 echo
-                make 2>&1 || { echo "\nCompile failed. Aborting install and cleaning up."; popd >/dev/null; exit_peacefully 1; }
+                verbose make 2>&1 || { echo -e "\nCompile failed. Aborting install and cleaning up."; popd >/dev/null; exit 1; }
                 echo
-                echo "------------------------ [ TESTING ] ------------------------"
+                echo "TESTING... (this will take a while)"
                 echo
-                make test 2>&1 || { echo "\nTesting failed. Aborting install and cleaning up."; popd >/dev/null; exit_peacefully 1; }
+                verbose make test 2>&1 || { echo -e "\nTesting failed. Aborting install and cleaning up."; popd >/dev/null; exit 1; }
                 echo
-                echo "------------------------ [ INSTALLING ] ------------------------"
+                echo "INSTALLING..."
                 echo
-                sudo make install 2>&1 || { echo "\Installing failed. Aborting install and cleaning up."; popd >/dev/null; exit_peacefully 1; }
-                popd >/dev/null
+                verbose sudo make install 2>&1 || { echo -e "\nInstalling failed. Aborting install and cleaning up."; popd >/dev/null; exit 1; }
+                popd 1>/dev/null
+
                 # Cleanup temp files, we no longer need them.
                 cleanup_tmp
             else
                 echo "Cannot find gcc. Aborting install and cleaning up."
-                exit_peacefully 1
+                exit 127
             fi
         else
             echo "Cannot find make. Aborting install and cleaning up."
-            exit_peacefully 1
+            exit 127
         fi
     fi
 }
+
+####################################
+# Parse arguments
+####################################
+
+# We chose not to use getopt(s) as our argument
+# parsing needs are quite simple.
+for i in "$@"; do
+    case $i in
+        -v|--verbose)
+            VERBOSE=0 # true
+            ;;
+        *) # Unknown argument
+            echo "Unknown argument '$i'. Exiting..."
+            exit 1
+            ;;
+    esac
+done
+
 
 ####################################
 # Start installation
@@ -147,7 +176,7 @@ echo "
 
 if ! ask_yn "Do you want to install codediff dependecies and utilities?"; then
     echo "Exiting installation script."
-    exit_peacefully 1
+    exit 0
 fi
 
 # Check if they have the required version of python3. If they do not, try to build in from source.
