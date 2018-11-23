@@ -299,7 +299,6 @@ if cmd_exists python3; then
         if ! install_python_pkg_mngr; then
             install_python_source
         fi
-        echo "All dependencies installed, you can now run codediff!"
     fi
 else
     # Cannot find python3, install
@@ -307,5 +306,11 @@ else
     if ! install_python_pkg_mngr; then
         install_python_source
     fi
+fi
+
+# Tell them if their depends installation has failed or suceeded
+if cmd_exist python3; then
     echo "All dependencies installed, you can now run codediff!"
+else
+    echo "Dependency installation failed, please try again."
 fi
