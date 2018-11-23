@@ -15,6 +15,9 @@ TMPFILE=$(mktemp -u)
 TMPDIR=$(mktemp -d) # MacOS might require a template for `mkdir`. See manpages.
 VERBOSE=1 # false
 
+# Set the OS to unkown. We check for the OS below.
+OS="UNKNOWN"
+
 # cleanup temp files in case of untimely exit.
 trap "cleanup_tmp" EXIT
 
@@ -137,6 +140,98 @@ function install_python_source {
     fi
 }
 
+function has_pkg_mngr {
+    : '''Determines if the current system has a package manager.
+
+    :return: If the current system has a package manager or not.
+    '''
+    local pkg_mngr_exists=1 # We assume that it is false until otherwise proven.
+    case "$OS" in
+      "SOLARIS")
+          # Solaris uses pkgadd.
+          if cmd_exists pkgadd; then
+              pkg_mngr_exists=0 # It exists! set pkg_mngr_exists to 0 (true).
+          fi
+          ;;
+      "MACOS")
+          # brew is the only codediff supported mac package manager.
+          if cmd_exists brew; then
+              pkg_mngr_exists=0
+          fi
+          ;;
+      "LINUX")
+          # linux has many distros with diffrent package managers.
+          # So we have to see if one exists.
+          for i in apt yum pacman; do # No current support for SUSE.
+              if cmd_exists "$i"; then
+                  pkg_mngr_exists=0
+              fi
+          done
+          ;;
+      # Windows doesn't have any default package manager, so ignore it.
+      # Also, we don't know the package manager on an unknown OS, so we assume
+      # There isn't one and ignore the default case.
+    esac
+    return $pkg_mngr_exists
+}
+
+function choose_pkg_mngr {
+    : '''Chooses the package manger for the current system.
+
+    :return: Nothing. The package manager as a string is written
+    to stdout. The expected returned values are brew, apt, yum,
+    pacman, and UNKNOWN.
+    '''
+    local pkg_mngr="UNKNOWN"
+    if has_pkg_mngr; then
+        case "$OS" in
+          # Ignore Solaris (pkgadd) for now
+          "MACOS") pkg_mngr="brew";;
+          "LINUX")
+              for i in "apt" "yum" "pacman"; do
+                  if cmd_exists "$i"; then
+                      pkg_mngr="$i"
+                  fi
+              done
+              ;;
+          # Because has_pkg_mngr will return false if the OS
+          # is not Linux, MacOS, or Solaris and pkg_mngr is set to
+          # "UNKNOWN" by default, we need not worry about the default case.
+        esac
+    fi
+    # We can't return strings, so we must print it to stdout.
+    # We can get the returned string by running $(choose_pkg_mngr)
+    echo $pkg_mngr
+}
+
+function install_python_pkg_mngr {
+    : '''Installs python using a package manager (apt, brew, etc.).
+    '''
+    local pkg_mngr=$(choose_pkg_mngr)
+    local install_str=""
+    if ask_yn "Would you like to try to install python using $pkg_mngr"; then
+        # Get the correct install string
+        case $pkg_mngr in
+          apt) install_str="apt-get install python3";;
+          yum) install_str="yum install python3";;
+          # In case pacman is not running on arch (arch has python3 by default)
+          pacman) install_str="pacman -S python3";;
+          brew) install_str="brew install python3";;
+          *)
+              echo "Could not find known package manager :(."
+              return 127
+              ;;
+        esac
+
+        # Once we have the correct install script, try to install python3
+        # (assuming that install script has been set)
+        if [[ ! -z install_str ]]; then
+            sudo $install_str 2>&1 || { return 1; }
+        fi
+        return 0
+    fi
+}
+
 ####################################
 # Parse arguments
 ####################################
@@ -145,16 +240,28 @@ function install_python_source {
 # parsing needs are quite simple.
 for i in "$@"; do
     case $i in
-        -v|--verbose)
-            VERBOSE=0 # true
-            ;;
-        *) # Unknown argument
-            echo "Unknown argument '$i'. Exiting..."
-            exit 1
-            ;;
+      -v|--verbose)
+          VERBOSE=0 # true
+          ;;
+      *) # Unknown argument
+          echo "Unknown argument '$i'. Exiting..."
+          exit 1
+          ;;
     esac
 done
 
+####################################
+# DETERMINE OS TYPE
+####################################
+
+case "$OSTYPE" in
+  # solaris*) OS="SOLARIS";;
+  darwin*) OS="MACOS";;
+  linux*) OS="LINUX";;
+  # bsd*) OS="BSD" ;;
+  msys*|cygwin*) OS="WIN";;
+  *) OS="UNKNOWN";;
+esac
 
 ####################################
 # Start installation
@@ -185,15 +292,20 @@ if cmd_exists python3; then
         # Good to go
         echo "Your $(python3 -V) distribution ($(command -v python3)) is up to date."
     else
-        # python3 exists, needs updating
+        # python3 exists, but needs updating
         echo "Found $(python3 -V) at $(command -v python3), but codediff requires at least Python $REQ_PYV."
-        # TODO first try to install for apt if on debian
-        install_python_source
+        # First we try to install with a package manager. If that fails (returns non zero code),
+        # We try to install using source.
+        if ! install_python_pkg_mngr; then
+            install_python_source
+        fi
         echo "All dependencies installed, you can now run codediff!"
     fi
 else
     # Cannot find python3, install
     echo "Cannot find python3 in \$PATH."
-    install_python_source
+    if ! install_python_pkg_mngr; then
+        install_python_source
+    fi
     echo "All dependencies installed, you can now run codediff!"
 fi
