@@ -186,8 +186,8 @@ function choose_pkg_mngr {
     if has_pkg_mngr; then
         case "$OS" in
           # Ignore Solaris (pkgadd) for now
-          "MACOS") pkg_mngr="brew";;
-          "LINUX")
+          MACOS) pkg_mngr="brew";;
+          LINUX)
               for i in "apt" "yum" "pacman"; do
                   if cmd_exists "$i"; then
                       pkg_mngr="$i"
@@ -232,6 +232,20 @@ function install_python_pkg_mngr {
     fi
 }
 
+function install_globally {
+    case "$OS" in
+      LINUX|WINDOWS) # assuming windows is cygwin
+          sudo cp -r ../codediff/ /usr/local/lib/codediff/
+          sudo ln -sf /usr/local/lib/codediff/codediff /usr/local/bin/codediff
+          ;;
+      MAC) # TODO install globally
+          ;;
+      *)
+          echo "Unknown operating system, cannot install globally."
+          ;;
+    esac
+}
+
 ####################################
 # Parse arguments
 ####################################
@@ -264,7 +278,7 @@ case "$OSTYPE" in
 esac
 
 ####################################
-# Start installation
+# Start python installation
 ###################################
 
 echo "
@@ -281,36 +295,61 @@ echo "
     GNU General Public License for more details.
 "
 
-if ! ask_yn "Do you want to install codediff dependecies and utilities?"; then
-    echo "Exiting installation script."
-    exit 0
-fi
-
-# Check if they have the required version of python3. If they do not, try to build in from source.
-if cmd_exists python3; then
-    if [[ $(python3 -V 2>&1 | sed "s/.* \([0-9]\).\([0-9]\).*/\1\2/") -ge  ${REQ_PYV/./} ]]; then
-        # Good to go
-        echo "Your $(python3 -V) distribution ($(command -v python3)) is up to date."
+if ! cmd_exists python3 && ask_yn "Do you want to install codediff dependecies and utilities?"; then
+    # Check if they have the required version of python3. If they do not, try to build in from source.
+    if cmd_exists python3; then
+        if [[ $(python3 -V 2>&1 | sed "s/.* \([0-9]\).\([0-9]\).*/\1\2/") -ge  ${REQ_PYV/./} ]]; then
+            # Good to go
+            echo "Your $(python3 -V) distribution ($(command -v python3)) is up to date."
+        else
+            # python3 exists, but needs updating
+            echo "Found $(python3 -V) at $(command -v python3), but codediff requires at least Python $REQ_PYV."
+            # First we try to install with a package manager. If that fails (returns non zero code),
+            # We try to install using source.
+            if ! install_python_pkg_mngr; then
+                install_python_source
+            fi
+        fi
     else
-        # python3 exists, but needs updating
-        echo "Found $(python3 -V) at $(command -v python3), but codediff requires at least Python $REQ_PYV."
-        # First we try to install with a package manager. If that fails (returns non zero code),
-        # We try to install using source.
+        # Cannot find python3, install
+        echo "Cannot find python3 in \$PATH."
         if ! install_python_pkg_mngr; then
             install_python_source
         fi
     fi
-else
-    # Cannot find python3, install
-    echo "Cannot find python3 in \$PATH."
-    if ! install_python_pkg_mngr; then
-        install_python_source
-    fi
 fi
 
 # Tell them if their depends installation has failed or suceeded
-if cmd_exist python3; then
-    echo "All dependencies installed, you can now run codediff!"
+if cmd_exists python3; then
+    echo "All dependencies have been installed, you can run codediff!"
 else
     echo "Dependency installation failed, please try again."
+    # We cannot continue with the global installation if python3 is
+    # not installed.
+    exit 1
+fi
+
+####################################
+# Start global installation
+###################################
+
+if cmd_exists codediff; then
+    if ask_yn "$(codediff --version) has already been installed globally ($(command -v codediff)).
+Overwrite it with version $(./codediff --version)?"; then
+        install_globally
+    else
+        echo "Exiting installation script."
+        exit 0
+    fi
+elif ask_yn "Do you want to install codediff globally?"; then
+    install_globally
+fi
+
+
+# Tell them if their depends installation has failed or suceeded
+if cmd_exists codediff; then
+    echo "codediff has been installed manually!"
+else
+    echo "codediff installation failed, please try again."
+    exit 1
 fi
