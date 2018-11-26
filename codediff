@@ -13,7 +13,7 @@
     GNU General Public License for more details.
 """
 
-__version__ = '0.0.1'
+__version__ = '0.0.1-develop'
 
 __author__ = 'Daniel Montgomery'
 __copyright__ = 'Copyright (C) 2018 Daniel Montgomery'
@@ -24,9 +24,17 @@ import argparse
 import logging
 import sys
 import textwrap
+import subprocess
 from src.parser import SnapXmlParser
 from src import logger
 from src.utils import FileError, FileIOError, sdv
+
+
+if 'develop' in __version__:
+    p = subprocess.Popen(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE)
+    resp, retcode = p.communicate()
+    if retcode is None:
+        __version__ += ' ({})'.format(resp.rstrip().decode('ascii'))
 
 class LicenseAction(argparse.Action):
     def __init__(self, option_strings, dest=argparse.SUPPRESS,
