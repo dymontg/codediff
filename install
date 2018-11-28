@@ -1,8 +1,286 @@
 #!/bin/bash
 
+####################################
+# Global variables
+####################################
+
+# The next three statements ensures bash handles errors more like a programming language.
+set -o pipefail # trace pipe errors
+set -o nounset # set -u: exit script if unising unitialized variables
+set -o errexit # set -e: exit script on error
+
 REQ_PYV="3.4"
 PYTHON_URI="https://www.python.org/ftp/python/3.7.1/Python-3.7.1.tgz"
-# TODO: add verbosity
+TMPFILE=$(mktemp -u)
+TMPDIR=$(mktemp -d) # MacOS might require a template for `mkdir`. See manpages.
+VERBOSE=1 # false
+
+# Set the OS to unkown. We check for the OS below.
+OS="UNKNOWN"
+
+# cleanup temp files in case of untimely exit.
+trap "cleanup_tmp" EXIT
+
+####################################
+# Helper functions
+####################################
+
+function ask_yn {
+    : ''' Asks a yes or no question to the user.
+
+    This fnction should be used in conjuction with an if test.
+    For example,
+
+    :param question - $1: The question to ask the user
+    :return: 0 if the user .
+    '''
+    local question=$1
+    echo -e "$question [y/N]\c  "
+    read yn
+
+    if [[ $(grep -ix "$yn" <<< "y" ) ]]; then
+        return 0
+    fi
+    return 1
+}
+
+function cleanup_tmp {
+    : '''Cleans up the temp files created when downloading python
+    from source.
+    '''
+    if [[ -f $TMPFILE ]]; then
+	    rm -rf $TMPFILE
+    fi
+    if [[ -d $TMPDIR ]]; then
+	    rm -rf $TMPDIR
+    fi
+}
+
+function cmd_exists {
+    : '''Check if a command exists. Similar to which, but is less
+    resource intensive and does not follow symlinks.
+
+    :param command - $1: the command to check
+    :returns: Wether the command exists
+    '''
+    if cmd_loc="$(command -v $1 2>&1)" && [[ -n $cmd_loc ]]; then
+        return 0
+    fi
+    return 1
+}
+
+function verbose {
+    : '''Redirects stdout to /dev/null if $VERBOSE is false (0).
+    '''
+    if [[ $VERBOSE -eq 0 ]]; then
+        "$@"
+    else
+        # Only redirect stdout to /dev/null (don't redirect stderr).
+        "$@" 1>/dev/null
+    fi
+}
+
+function install_python_source {
+    : '''Installs python from source.
+    '''
+    if ask_yn "Would you like to try to download and install Python 3.7.1 from source? Requires make."; then
+
+        echo
+        echo "Downloading python source code..."
+
+        # Download the source code using curl or wget. If none are found,
+        # exit peacefully.
+        if cmd_exists curl; then
+            curl --progress-bar $PYTHON_URI -o $TMPFILE
+        elif cmd_exists wget; then
+            wget $PYTHON_URI -q --show-progress -O $TMPFILE
+        else
+            echo "Cannot find wget or curl in \$PATH: cannot download python3."
+            exit 127
+        fi
+
+        echo "Decompressing..."
+        # Untar the archive
+        # tar removes the temp file
+        tar -C $TMPDIR --strip-components=1 -xzf $TMPFILE
+
+        if cmd_exists make; then
+            if cmd_exists gcc; then
+                # We presumably have everything we need to build and install python.
+                pushd $TMPDIR 1>/dev/null
+                echo "Found $(make -v | head -1) and $(gcc --version | head -n 1). Configuring, compiling, and installing."
+                echo
+                echo "CONFIGURING..."
+                echo
+                verbose ./configure 2>&1 || { echo -e "\nCofiguring failed. Aborting install and cleaning up."; popd >/dev/null; exit 1; }
+                echo
+                echo "COMPILING... (this will take a while)"
+                echo
+                verbose make 2>&1 || { echo -e "\nCompile failed. Aborting install and cleaning up."; popd >/dev/null; exit 1; }
+                echo
+                echo "TESTING... (this will take a while)"
+                echo
+                verbose make test 2>&1 || { echo -e "\nTesting failed. Aborting install and cleaning up."; popd >/dev/null; exit 1; }
+                echo
+                echo "INSTALLING..."
+                echo
+                verbose sudo make install 2>&1 || { echo -e "\nInstalling failed. Aborting install and cleaning up."; popd >/dev/null; exit 1; }
+                popd 1>/dev/null
+
+                # Cleanup temp files, we no longer need them.
+                cleanup_tmp
+            else
+                echo "Cannot find gcc. Aborting install and cleaning up."
+                exit 127
+            fi
+        else
+            echo "Cannot find make. Aborting install and cleaning up."
+            exit 127
+        fi
+    fi
+}
+
+function has_pkg_mngr {
+    : '''Determines if the current system has a package manager.
+
+    :return: If the current system has a package manager or not.
+    '''
+    local pkg_mngr_exists=1 # We assume that it is false until otherwise proven.
+    case "$OS" in
+      "SOLARIS")
+          # Solaris uses pkgadd.
+          if cmd_exists pkgadd; then
+              pkg_mngr_exists=0 # It exists! set pkg_mngr_exists to 0 (true).
+          fi
+          ;;
+      "MACOS")
+          # brew is the only codediff supported mac package manager.
+          if cmd_exists brew; then
+              pkg_mngr_exists=0
+          fi
+          ;;
+      "LINUX")
+          # linux has many distros with diffrent package managers.
+          # So we have to see if one exists.
+          for i in apt yum pacman; do # No current support for SUSE.
+              if cmd_exists "$i"; then
+                  pkg_mngr_exists=0
+              fi
+          done
+          ;;
+      # Windows doesn't have any default package manager, so ignore it.
+      # Also, we don't know the package manager on an unknown OS, so we assume
+      # There isn't one and ignore the default case.
+    esac
+    return $pkg_mngr_exists
+}
+
+function choose_pkg_mngr {
+    : '''Chooses the package manger for the current system.
+
+    :return: Nothing. The package manager as a string is written
+    to stdout. The expected returned values are brew, apt, yum,
+    pacman, and UNKNOWN.
+    '''
+    local pkg_mngr="UNKNOWN"
+    if has_pkg_mngr; then
+        case "$OS" in
+          # Ignore Solaris (pkgadd) for now
+          MACOS) pkg_mngr="brew";;
+          LINUX)
+              for i in "apt" "yum" "pacman"; do
+                  if cmd_exists "$i"; then
+                      pkg_mngr="$i"
+                  fi
+              done
+              ;;
+          # Because has_pkg_mngr will return false if the OS
+          # is not Linux, MacOS, or Solaris and pkg_mngr is set to
+          # "UNKNOWN" by default, we need not worry about the default case.
+        esac
+    fi
+    # We can't return strings, so we must print it to stdout.
+    # We can get the returned string by running $(choose_pkg_mngr)
+    echo $pkg_mngr
+}
+
+function install_python_pkg_mngr {
+    : '''Installs python using a package manager (apt, brew, etc.).
+    '''
+    local pkg_mngr=$(choose_pkg_mngr)
+    local install_str=""
+    if ask_yn "Would you like to try to install python using $pkg_mngr"; then
+        # Get the correct install string
+        case $pkg_mngr in
+          apt) install_str="apt-get install python3";;
+          yum) install_str="yum install python3";;
+          # In case pacman is not running on arch (arch has python3 by default)
+          pacman) install_str="pacman -S python3";;
+          brew) install_str="brew install python3";;
+          *)
+              echo "Could not find known package manager :(."
+              return 127
+              ;;
+        esac
+
+        # Once we have the correct install script, try to install python3
+        # (assuming that install script has been set)
+        if [[ ! -z install_str ]]; then
+            sudo $install_str 2>&1 || { return 1; }
+        fi
+        return 0
+    fi
+}
+
+function install_globally {
+    case "$OS" in
+      LINUX|WINDOWS) # assuming windows is cygwin
+          sudo cp -r ../codediff/ /usr/local/lib/codediff/
+          sudo ln -sf /usr/local/lib/codediff/codediff /usr/local/bin/codediff
+          ;;
+      MAC) # TODO install globally
+          ;;
+      *)
+          echo "Unknown operating system, cannot install globally."
+          ;;
+    esac
+}
+
+####################################
+# Parse arguments
+####################################
+
+# We chose not to use getopt(s) as our argument
+# parsing needs are quite simple.
+for i in "$@"; do
+    case $i in
+      -v|--verbose)
+          VERBOSE=0 # true
+          ;;
+      *) # Unknown argument
+          echo "Unknown argument '$i'. Exiting..."
+          exit 1
+          ;;
+    esac
+done
+
+####################################
+# DETERMINE OS TYPE
+####################################
+
+case "$OSTYPE" in
+  # solaris*) OS="SOLARIS";;
+  darwin*) OS="MACOS";;
+  linux*) OS="LINUX";;
+  # bsd*) OS="BSD" ;;
+  msys*|cygwin*) OS="WIN";;
+  *) OS="UNKNOWN";;
+esac
+
+####################################
+# Start python installation
+###################################
+
 echo "
     Copyright (C) 2018 Daniel Montgomery
 
@@ -14,95 +292,64 @@ echo "
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details."
+    GNU General Public License for more details.
+"
 
-echo
-echo -e "Do you want to install codediff dependecies and utilities? [y/N]\c  "
-read install
-
-if [[ ! $(fgrep -ix "$install" <<< "y" ) ]]; then
-    echo "Exiting installation script."
-    exit 0
-fi
-
-echo
-
-function cleanup { # $1 - tmpfile $2 - tmpdir
-    # TODO: make calling this easier. Passing args is error prone and annoying.
-    # cleanup temp files
-    if [ -f $1 ]; then
-	rm -rf $1
-    fi
-    if [ -d $2 ]; then
-	rm -rf $2
-    fi
-}
-
-function install_python_source {
-    echo -e "Would you like to try to download and install Python 3.7.1 from source? Requires make. [y/N]\c "
-    # TODO get python version from uri
-    read ipython
-
-    if [[ $(grep -ix "$ipython" <<< "y") ]]; then
-        tmpfile=$(mktemp -u)
-        tmpdir=$(mktemp -d) # MACOS might require a template for `mkdir`. See manpages.
-        echo
-        echo "Downloading python source code..."
-        # TODO: maybe use curl
-        wget $PYTHON_URI -q --show-progress -O $tmpfile
-        echo "Decompressing..."
-        # tar removes tmpfile
-        tar -C $tmpdir --strip-components=1 -xzf $tmpfile
-        if make_loc="$(command -v make 2>&1)" && [[ -n $make_loc ]]; then
-            if gcc_loc="$(command -v gcc 2>&1)" && [[ -n $gcc_loc ]]; then
-                pushd $tmpdir >dev/null
-                echo "Found $(make -v | head -1) and $(gcc --version | head -n 1). Configuring, compiling, and installing."
-                echo
-                echo "------------------------ [ CONFIGURING ] ------------------------"
-                echo
-                ./configure 2>&1 || { echo "\nCofiguring failed. Aborting install and cleaning up."; cleanup $tmpfile $tmpdir; popd >/dev/null; exit 1; }
-                echo
-                echo "------------------------ [ COMPILING ] ------------------------"
-                echo
-                make 2>&1 || { echo "\nCompile failed. Aborting install and cleaning up."; cleanup $tmpfile $tmpdir; popd >/dev/null; exit 1; }
-                echo
-                echo "------------------------ [ TESTING ] ------------------------"
-                echo
-                make test 2>&1 || { echo "\nTesting failed. Aborting install and cleaning up."; cleanup $tmpfile $tmpdir; popd >/dev/null; exit 1; }
-                echo
-                echo "------------------------ [ INSTALLING ] ------------------------"
-                echo
-                sudo make install 2>&1 || { echo "\Installing failed. Aborting install and cleaning up."; cleanup $tmpfile $tmpdir; popd >/dev/null; exit 1; }
-                popd >/dev/null
-            else
-                echo "Cannot find gcc. Aborting install and cleaning up."
-                cleanup $tmpfile $tmpdir
-                exit 1
-            fi
+if ! cmd_exists python3 && ask_yn "Do you want to install codediff dependecies and utilities?"; then
+    # Check if they have the required version of python3. If they do not, try to build in from source.
+    if cmd_exists python3; then
+        if [[ $(python3 -V 2>&1 | sed "s/.* \([0-9]\).\([0-9]\).*/\1\2/") -ge  ${REQ_PYV/./} ]]; then
+            # Good to go
+            echo "Your $(python3 -V) distribution ($(command -v python3)) is up to date."
         else
-            echo "Cannot find make. Aborting install and cleaning up."
-            cleanup $tmpfile $tmpdir
-            exit 1
+            # python3 exists, but needs updating
+            echo "Found $(python3 -V) at $(command -v python3), but codediff requires at least Python $REQ_PYV."
+            # First we try to install with a package manager. If that fails (returns non zero code),
+            # We try to install using source.
+            if ! install_python_pkg_mngr; then
+                install_python_source
+            fi
+        fi
+    else
+        # Cannot find python3, install
+        echo "Cannot find python3 in \$PATH."
+        if ! install_python_pkg_mngr; then
+            install_python_source
         fi
     fi
-}
-
-# Check if they have the required version of python3. If they do not, try to build in from source.
-# TODO: make the conditional into a function.
-if python_loc="$(command -v python3 2>&1)" && [[ -n $python_loc ]]; then
-    if [ $(python3 -V 2>&1 | sed "s/.* \([0-9]\).\([0-9]\).*/\1\2/") -ge  ${REQ_PYV/./} ]; then
-        # Good to go
-        echo "Your $(python3 -V 2>&1) distribution ($(command -v python3)) is up to date."
-    else
-        # python3 exists, needs updating
-        echo "Found $(python3 -V 2>&1) at $(command -v python3), but codediff requires at least Python $REQ_PYV."
-        # TODO first try to install for apt if on debian
-        install_python_source
-    fi
-else
-    # Cannot find python3, install
-    echo "Cannot find python3 in \$PATH."
-    install_python_source
 fi
 
-echo "All dependencies installed, you can now run codediff!"
+# Tell them if their depends installation has failed or suceeded
+if cmd_exists python3; then
+    echo "All dependencies have been installed, you can run codediff!"
+else
+    echo "Dependency installation failed, please try again."
+    # We cannot continue with the global installation if python3 is
+    # not installed.
+    exit 1
+fi
+
+####################################
+# Start global installation
+###################################
+
+if cmd_exists codediff; then
+    if ask_yn "$(codediff --version) has already been installed globally ($(command -v codediff)).
+Overwrite it with version $(./codediff --version)?"; then
+        install_globally
+    else
+        echo "Exiting installation script."
+        exit 0
+    fi
+elif ask_yn "Do you want to install codediff globally?"; then
+    install_globally
+fi
+
+
+# Tell them if their depends installation has failed or suceeded
+if cmd_exists codediff; then
+    echo "codediff has been installed manually!"
+else
+    echo "codediff installation failed, please try again."
+    exit 1
+fi
