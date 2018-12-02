@@ -4,31 +4,33 @@
 
 import logging
 import difflib
-from src.filereport import SnapReport
+# from statistics import mean
 
 _logger = logging.getLogger('codediff')
 
 
-class SnapMatcher:
-    def __init__(self, path1, path2):
-        # TODO Ensure paths have been parsed
-        self.path1 = path1
-        self.path2 = path2
+class SequenceMatcher:
+    def __init__(self, report1, report2):
+        self.report1 = report1
+        self.report2 = report2
 
     def ratio(self):
+        # Currently the reports contents contain every character. In the future, we
+        # want to calculate the ratio of a fragmented file.
+        # To calculate the actual ratio, we iterate through the content generator
+        # and append it to a diff ratio array.
+        diff_ratios = []
         _logger.debug('========== BEGIN `%s::%s::ratio` ==========', __name__, self.__class__.__name__)
-        with open(self.path1, 'r') as xml, open(self.path2, 'r') as xml2:
-            seq_match = difflib.SequenceMatcher(lambda x: x in " \t", xml.read(), xml2.read())
-            _logger.info('Comparing %s and %s.......', self.path1, self.path2, extra={'terminator': ''})
-            diff_ratio = seq_match.quick_ratio()
-            _logger.info('DONE - %d%% similar', round(float(diff_ratio)*100, 1))
-            _logger.debug('========== END `%s::%s::ratio` ==========', __name__, self.__class__.__name__)
+        _logger.info('Comparing %s and %s.......', self.report1, self.report2, extra={'terminator': ''})
+        # for character_seq, character_seq_2 in zip(self.report1.content, self.report2.content):
+        character_seq = self.report1.content
+        character_seq_2 = self.report2.content
+        seq_match = difflib.SequenceMatcher(lambda x: x in " \t", character_seq, character_seq_2)
+        diff_ratios.append(seq_match.quick_ratio())
+
+        # The next line is where we would determine the actual diff ratio
+        # if the file was fragmented.
+        diff_ratio = diff_ratios[0]
+        _logger.info('DONE - %d%% similar', round(float(diff_ratio)*100, 1))
+        _logger.debug('========== END `%s::%s::ratio` ==========', __name__, self.__class__.__name__)
         return diff_ratio
-
-
-def snapcompare(parsed_paths):
-    ratios = {}
-    for i, path1 in enumerate(parsed_paths):
-        for path2 in parsed_paths[i+1:]:
-            ratios[path1, path2] = SnapMatcher(path1, path2).ratio()
-    return ratios

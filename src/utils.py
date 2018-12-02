@@ -51,3 +51,15 @@ def lineify_xml(path, encoding='utf-8'):
             current_tell = xml.tell()
             content = xml.read(_BLOCK_SIZE).decode(encoding)'''
     _logger.debug('========== END `%s::lineify_xml` ==========', __name__)
+
+def dict_verify(dictionary, kws):
+    pure_kws = [x.split('=')[0] if '=' in x else x for x in kws]
+    # First we check for default values
+    for item in [x for x in kws if '=' in x]:
+        key, value = item.split('=')
+        dictionary[key] = value
+
+    # Then we verify that the dictionary has the proper values
+    for key, _ in dictionary.items():
+        if key not in pure_kws:
+            raise ValueError('Key `{}` not in acceptable keywords.'.format(key))

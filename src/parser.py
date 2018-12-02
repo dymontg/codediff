@@ -3,22 +3,51 @@
 """
 
 import re, os, logging
-import difflib
+import xml.etree.ElementTree as et
 from src.validators import PathValidator
+from src.report import FileReport
+from src.report.snap_report import SnapReport
 from src.utils import UnsupportedFiletypeError, NotEnoughFilesError
 
 _logger = logging.getLogger('codediff')
 
 class FileParser:
-    pass
-
-class SnapParser(FileParser):
     def __init__(self, path):
-        # TODO Ensure path has been parsed
+        # TODO Ensure path as been parsed
         self.path = path
 
     def parse(self):
-        pass
+        with open(self.path, 'r') as f:
+            # We pass the whole files content in for now, but we really should
+            # fragament it.
+            report = FileReport(self.path, f.read(),
+                                os.path.getsize(self.path))
+
+        return report
+
+def parse_files(parsed_paths):
+    files = []
+    for i, path1 in enumerate(parsed_paths):
+        parsed_file1 = FileParser(path1).parse()
+        for path2 in parsed_paths[i+1:]:
+            files.append((path1, path2, parsed_file1, FileParser(path2).parse()))
+    return files
+
+class SnapParser(FileParser):
+    def __init__(self, path):
+        super(SnapParser, self).__init__(path)
+
+    def parse(self):
+        project = et.parse(self.path).getroot()
+        name = project.attrib['name']
+        stage = project.find('stage')
+        blocks = project.find('blocks')
+        custom_vars = project.find('variables')
+
+        return SnapReport(self.path, project=project,
+                          name=name, stage=stage, blocks=blocks,
+                          vars=custom_vars)
+
 
 class PathParser:
     def __init__(self, paths, validator=None):
