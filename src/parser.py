@@ -65,7 +65,7 @@ class PathParser:
                 _logger.debug('%s is a file', path)
                 if self.validator:
                     self.validator.validate_file(path)
-                paths += path
+                paths.append(path)
             elif os.path.isdir(path):
                 _logger.debug('%s is a directory', path)
                 path = path.rstrip('/') # Will only work on unix, use os.path.normalpath for windows
