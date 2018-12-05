@@ -3,7 +3,7 @@
 """
 import re
 import logging
-
+from xml.dom.minidom import parse as xmlparse
 
 class FileError(Exception):
     pass
@@ -39,40 +39,27 @@ class Pair:
             return self.a
         return self.b
 
-def lineify_xml(path, encoding='utf-8'):
+def prettyformatxml(path, encoding=None):
     """
-    Takes one line xml and splits it into many. Makes it
-    human readable.
+    Takes a one line xml file and splits it into many.
+    Formats the xml to be more readable.
+    :param path: path to file as a string.
+    :return: the prettier xml.
+    """
+    return xmlparse(path, encoding).toprettyxml(indent=' '*2)
+
+
+def prettyfilexml(path, encoding=None):
+    """
+    Takes a one line xml file and splits it into many.
+    Formats the xml to be more readable.
     :param path: path to file as a string.
     :return: None.
     """
-    _logger = logging.getLogger('codediff')
-    _logger.debug('========== BEGIN ` %s::lineify_xml` ==========', __name__)
-    _REGEX_LITERAL = r'><'
-    logging.debug('Lineifying xml file %s with encoding %s.', path, encoding)
-    with open(path, 'rb+') as xml:
-        # Currently, we read the whole file into memory.
-        # We could also has an ifile and ofile, with filename `filename.lineified.xml`.
-        # Could check for changes using a hash.
-        logging.debug('Subsituting %s with >\\n<', _REGEX_LITERAL)
-        content = re.sub(_REGEX_LITERAL, r'>\n<', xml.read().decode(encoding), flags=re.M)
-        logging.debug('Seeking 0th byte, truncating, and writing substitued content.')
-        xml.seek(0)
-        xml.truncate()
-        xml.write(bytes(content, encoding))
-        # WIP: bugged
-        '''_BLOCK_SIZE = 4096 # bytes
-        current_tell = xml.tell()
-        while content:
-            content = re.sub(_REGEX_LITERAL, r'>\n<', content, flags=re.M)
-            delta_blen = len(content) - _BLOCK_SIZE
-            xml.write(bytes('\23'*delta_blen, encoding))
-            xml.seek(current_tell)
-            xml.write(bytes(content, encoding))
-            current_tell = xml.tell()
-            content = xml.read(_BLOCK_SIZE).decode(encoding)'''
-    _logger.debug('========== END `%s::lineify_xml` ==========', __name__)
-
+    xml_str = prettyformatxml(path, encoding).encode(encoding or 'utf-8')
+    # TODO: We should still write to the file in blocks, not all at once.
+    with open(path, 'wb') as xml:
+        xml.write(xml_str)
 
 def sdv(d, reverse=False):
     """Sort a dictionary by value and return a representation
