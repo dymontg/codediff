@@ -25,12 +25,21 @@ class FileParser:
 
         return report
 
-def parse_files(parsed_paths):
+def parsefiles(parsed_paths):
     files = []
     for i, path1 in enumerate(parsed_paths):
         parsed_file1 = FileParser(path1).parse()
         for path2 in parsed_paths[i+1:]:
             files.append((path1, path2, parsed_file1, FileParser(path2).parse()))
+    return files
+
+
+def parsesnapfiles(parsed_paths):
+    files = []
+    for i, path1 in enumerate(parsed_paths):
+        parsed_file1 = SnapParser(path1).parse()
+        for path2 in parsed_paths[i+1:]:
+            files.append((path1, path2, parsed_file1, SnapParser(path2).parse()))
     return files
 
 class SnapParser(FileParser):

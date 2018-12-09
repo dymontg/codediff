@@ -22,8 +22,8 @@ __license__ = 'GPLv3'
 
 import argparse, logging
 from src import logger
-from src.parser import PathParser, parse_files
-from src.matcher import SequenceMatcher
+from src.parser import PathParser, parsesnapfiles
+from src.matcher import SnapMatcher
 from src.validators import SnapPathValidator
 from src.utils import FileError, FileIOError
 
@@ -83,8 +83,8 @@ if __name__ == '__main__':
         parsed_paths = PathParser(args.input_files, SnapPathValidator()).parse()
         _logger.debug('Computing ratios...')
         ratios = []
-        for file_tuple in parse_files(parsed_paths):
-            ratios.append(SequenceMatcher(file_tuple[2], file_tuple[3]).ratio())
+        for file_tuple in parsesnapfiles(parsed_paths):
+            ratios.append(SnapMatcher(file_tuple[2], file_tuple[3]).compare())
         _logger.debug('Found following ratios: %s', ratios)
     except (FileError, FileIOError) as e:
         argparser.error(str(e))
