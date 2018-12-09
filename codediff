@@ -25,9 +25,11 @@ import logging
 import sys
 import textwrap
 import subprocess
-from src.parser import SnapXmlParser
 from src import logger
-from src.utils import FileError, FileIOError, sdv
+from src.parser import PathParser, parsesnapfiles
+from src.matcher import SnapMatcher
+from src.validators import SnapPathValidator
+from src.utils import FileError, FileIOError
 
 
 if 'develop' in __version__:
@@ -35,6 +37,7 @@ if 'develop' in __version__:
     resp, retcode = p.communicate()
     if retcode is None:
         __version__ += ' ({})'.format(resp.rstrip().decode('ascii'))
+
 
 class LicenseAction(argparse.Action):
     def __init__(self, option_strings, dest=argparse.SUPPRESS,
@@ -57,6 +60,7 @@ class LicenseAction(argparse.Action):
             parser._print_message('read it here: https://www.gnu.org/licenses/gpl-3.0.txt\n', sys.stdout)
         finally:
             parser.exit()
+
 
 if __name__ == '__main__':
     # Initalizes argparser
@@ -90,18 +94,13 @@ if __name__ == '__main__':
 
     # Run the program.
     try:
-        _logger.debug('Creating SnapXmlParser instance...')
-        snap_parser = SnapXmlParser(args.input_files)
-        _logger.debug('Computing ratios...')
-        ratios = snap_parser.ratios()
-        # formatter = argparser._get_formatter()
-        for path_pair, ratio in sdv(ratios):
-            print('Compared {} and {}: {}% similar'.format(path_pair[0], path_pair[1],
-                                                           round(float(ratio)*100, 1)))
-        # TODO use parser formatting.
-        # formatter.add_text(str(line[:-1]))
-        # argparser._print_message(formatter.format_help(), sys.stdout)
-
+        _logger.debug('Creating PathParser instance...')
+        parsed_paths = PathParser(args.input_files, SnapPathValidator()).parse()
+        _logger.debug('Computing compare...')
+        sim = []
+        for _, file_pair in parsesnapfiles(parsed_paths).items():
+            sim.append(SnapMatcher(file_pair.a, file_pair.b).compare())
+        _logger.debug('Found following ratios: %s', sim)
     except (FileError, FileIOError) as e:
         argparser.error(str(e))
     except Exception as e:

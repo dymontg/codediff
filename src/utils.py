@@ -39,6 +39,7 @@ class Pair:
             return self.a
         return self.b
 
+
 def lineify_xml(path, encoding='utf-8'):
     """
     Takes one line xml and splits it into many. Makes it
@@ -74,12 +75,14 @@ def lineify_xml(path, encoding='utf-8'):
     _logger.debug('========== END `%s::lineify_xml` ==========', __name__)
 
 
-def sdv(d, reverse=False):
-    """Sort a dictionary by value and return a representation
-    of it as a list.
+def dict_verify(dictionary, kws):
+    pure_kws = [x.split('=')[0] if '=' in x else x for x in kws]
+    # First we check for default values
+    for item in [x for x in kws if '=' in x]:
+        key, value = item.split('=')
+        dictionary[key] = value
 
-    :param d: the dictionary to sort
-    :param reverse: whether to reverse the order. Default is false.
-    :returns: a sorted list.
-    """
-    return sorted(d.items(), key=lambda t: t[1], reverse=reverse)
+    # Then we verify that the dictionary has the proper values
+    for key, _ in dictionary.items():
+        if key not in pure_kws:
+            raise ValueError('Key `{}` not in acceptable keywords.'.format(key))
