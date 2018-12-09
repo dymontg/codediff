@@ -2,14 +2,16 @@
     See codediff executable for copyright disclaimer.
 """
 
-import re, os, logging
+import os
+import logging
 import xml.etree.ElementTree as et
 from src.validators import PathValidator
 from src.report import FileReport
 from src.report.snap_report import SnapReport
-from src.utils import UnsupportedFiletypeError, NotEnoughFilesError
+from src.utils import NotEnoughFilesError, Pair
 
 _logger = logging.getLogger('codediff')
+
 
 class FileParser:
     def __init__(self, path):
@@ -25,22 +27,24 @@ class FileParser:
 
         return report
 
+
 def parsefiles(parsed_paths):
-    files = []
+    files = {}
     for i, path1 in enumerate(parsed_paths):
         parsed_file1 = FileParser(path1).parse()
         for path2 in parsed_paths[i+1:]:
-            files.append((path1, path2, parsed_file1, FileParser(path2).parse()))
+            files[Pair(path1, path2)] = Pair(parsed_file1, FileParser(path2).parse())
     return files
 
 
 def parsesnapfiles(parsed_paths):
-    files = []
+    files = {}
     for i, path1 in enumerate(parsed_paths):
         parsed_file1 = SnapParser(path1).parse()
         for path2 in parsed_paths[i+1:]:
-            files.append((path1, path2, parsed_file1, SnapParser(path2).parse()))
+            files[Pair(path1, path2)] = Pair(parsed_file1, SnapParser(path2).parse())
     return files
+
 
 class SnapParser(FileParser):
     def __init__(self, path):

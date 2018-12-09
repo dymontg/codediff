@@ -1,10 +1,14 @@
-import logging, sys
+""" CodeDiff - A file differencer for use in APCS(P) classes.
+    See codediff executable for copyright disclaimer.
+"""
+import logging
+import sys
 
 def init_logger(log_level):
     _logger = logging.getLogger('codediff')
     _logger.setLevel(log_level)
-#    stdout_handler = logging.StreamHandler(stream=sys.stdout) # Logging handler for debug and verbosity
-#    stdout_handler.setLevel(log_level) # only show errors if they don't enable debugging
+#    stdout_handler = logging.StreamHandler(stream=sys.stdout) # Logging handler for debug and verbosity.
+#    stdout_handler.setLevel(log_level) # only show errors if they don't enable debugging.
 #    stdout_handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
     handler = LeveledStreamHandler()
     handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
