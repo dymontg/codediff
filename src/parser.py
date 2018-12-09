@@ -2,63 +2,99 @@
     See codediff executable for copyright disclaimer.
 """
 
-import re, os
-import difflib
-from src.utils import UnsupportedFiletypeError, NotEnoughFilesError
+import os
+import logging
+import xml.etree.ElementTree as et
+from src.validators import PathValidator
+from src.report import FileReport
+from src.report.snap_report import SnapReport
+from src.utils import NotEnoughFilesError, Pair
 
-class XmlParser:
+_logger = logging.getLogger('codediff')
+
+
+class FileParser:
     def __init__(self, path):
-        self.paths = []
-        if type(path) is list:
-            self._validate_paths(path)
-        if type(path) is str:
-            self._validate_paths([path])
+        # TODO Ensure path as been parsed
+        self.path = path
 
-    def _validate_paths(self, paths):
-        for path in paths:
+    def parse(self):
+        with open(self.path, 'r') as f:
+            # We pass the whole files content in for now, but we really should
+            # fragament it.
+            report = FileReport(self.path, f.read(),
+                                os.path.getsize(self.path))
+
+        return report
+
+
+def parsefiles(parsed_paths):
+    files = {}
+    for i, path1 in enumerate(parsed_paths):
+        parsed_file1 = FileParser(path1).parse()
+        for path2 in parsed_paths[i+1:]:
+            files[Pair(path1, path2)] = Pair(parsed_file1, FileParser(path2).parse())
+    return files
+
+
+def parsesnapfiles(parsed_paths):
+    files = {}
+    for i, path1 in enumerate(parsed_paths):
+        parsed_file1 = SnapParser(path1).parse()
+        for path2 in parsed_paths[i+1:]:
+            files[Pair(path1, path2)] = Pair(parsed_file1, SnapParser(path2).parse())
+    return files
+
+
+class SnapParser(FileParser):
+    def __init__(self, path):
+        super(SnapParser, self).__init__(path)
+
+    def parse(self):
+        project = et.parse(self.path).getroot()
+        name = project.attrib['name']
+        stage = project.find('stage')
+        blocks = project.find('blocks')
+        custom_vars = project.find('variables')
+
+        return SnapReport(self.path, project=project,
+                          name=name, stage=stage, blocks=blocks,
+                          vars=custom_vars)
+
+
+class PathParser:
+    def __init__(self, paths, validator=None):
+        if validator and not isinstance(validator, PathValidator):
+            raise TypeError('Path validator must be an instance of `PathValidator`')
+        self.paths = paths
+        self.validator = validator
+
+    def parse(self):
+        _logger.debug('========== BEGIN `%s::%s::parse` ==========', __name__, self.__class__.__name__)
+        _logger.debug('Parsing paths %s', self.paths)
+        paths = []
+        for path in self.paths:
             if os.path.isfile(path):
-                self._validate_file(path)
-                self.paths.append(path)
+                _logger.debug('%s is a file', path)
+                if self.validator:
+                    self.validator.validate_file(path)
+                paths.append(path)
             elif os.path.isdir(path):
-                if path.endswith('/'):
-                    path = path[:-1] # Remove extra backslash if required
-
-                filename_paths = [root + '/' + x for root, _, files_list in os.walk(path) for x in files_list]
-                xml_filename_paths = [x for x in filename_paths if x.endswith('.xml')]
-                for filename_path in xml_filename_paths:
-                    self._validate_file(filename_path)
-                    self.paths.append(filename_path)
+                _logger.debug('%s is a directory', path)
+                path = path.rstrip('/') # Will only work on unix, use os.path.normalpath for windows
+                file_paths = [root + '/' + x for root, _, files_list in os.walk(path) for x in files_list]
+                if self.validator:
+                    self.validator.validate_dir(file_paths)
+                paths += file_paths
             else:
                 raise FileNotFoundError('Could not find file {}. Aborting.'.format(path))
 
-        if len(self.paths) < 2:
+        if len(paths) < 2:
             raise NotEnoughFilesError('Expecting at least two xml files but found less than two.')
 
-    def _validate_file(self, path):
-        if not path.endswith('.xml'):
-            raise UnsupportedFiletypeError('{} is not an supported xml file type. Aborting.'.format(path))
+        _logger.debug('========== END `%s::%s::parse` ==========', __name__, self.__class__.__name__)
+        return paths
 
-    def ratios(self):
-        self.diff_ratios = dict()
-        for i, path in enumerate(self.paths):
-            with open(path, 'r') as xml:
-                for path2 in self.paths[i+1:]:
-                    xml.seek(0)
-                    with open(path2, 'r') as xml2:
-                        seq_match = difflib.SequenceMatcher(lambda x: x in " \t", xml.read(), xml2.read())
-                        ratio = seq_match.quick_ratio()
-                        self.diff_ratios[path, path2] = ratio
-
-        return self.diff_ratios
-
-class SnapXmlParser(XmlParser):
-    def _validate_file(self, path):
-        _REGEX_LITERAL = re.compile(r'^<project name=".*?" app=".*? http:\/\/snap.berkeley.edu" version=".*?">')
-        super(SnapXmlParser, self)._validate_file(path)
-
-        with open(path, 'r') as snap_xml:
-            # Only read the first 4096 bytes, as the project directive should be at the top of the file.
-            # (Let's hope their project name is not massive!)
-            if re.match(_REGEX_LITERAL, snap_xml.read(4096)) is None:
-                # Tests if the regex does not match the first 4096 bytes.
-                raise UnsupportedFiletypeError('{} is not a supported snap xml. Aborting.'.format(path))
+    def __iter__(self):
+        parsed_paths = self.parse()
+        yield parsed_paths

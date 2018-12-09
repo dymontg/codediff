@@ -13,7 +13,7 @@
     GNU General Public License for more details.
 """
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 __author__ = 'Daniel Montgomery'
 __copyright__ = 'Copyright (C) 2018 Daniel Montgomery'
@@ -21,50 +21,87 @@ __credits__ = ['Daniel Montgomery', 'Cole Mediratta', 'Blake Sanie']
 __license__ = 'GPLv3'
 
 import argparse
+import logging
 import sys
-from src.parser import SnapXmlParser
+import textwrap
+import subprocess
+from src import logger
+from src.parser import PathParser, parsesnapfiles
+from src.matcher import SnapMatcher
+from src.validators import SnapPathValidator
 from src.utils import FileError, FileIOError
 
+
+if 'develop' in __version__:
+    p = subprocess.Popen(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE)
+    resp, retcode = p.communicate()
+    if retcode is None:
+        __version__ += ' ({})'.format(resp.rstrip().decode('ascii'))
+
+
 class LicenseAction(argparse.Action):
-    def __init__(self, option_strings, dest=argparse.SUPPRESS, default=argparse.SUPPRESS, help='Show CodeDiff\'s license and exit.'):
-        super(LicenseAction, self).__init__(option_strings=option_strings, dest=dest, default=default, nargs=0, help=help)
+    def __init__(self, option_strings, dest=argparse.SUPPRESS,
+                 default=argparse.SUPPRESS,
+                 help='Show CodeDiff\'s license and exit.'):
+        super(LicenseAction, self).__init__(option_strings=option_strings,
+                                            dest=dest,
+                                            default=default,
+                                            nargs=0,
+                                            help=help)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        # formatter = parser._get_formatter()
-        with open('LICENSE', 'r') as cdlicense:
-            for line in cdlicense:
-                print(line[:-1])
-                # TODO use parser formatting.
-                #formatter.add_text(str(line[:-1]))
-#        parser._print_message(formatter.format_help(), sys.stdout)
-        parser.exit()
+        try:
+            with open('LICENSE', 'r') as cdlicense:
+                for line in cdlicense:
+                    # We can't use logger here because it is yet to be defined
+                    parser._print_message(line, sys.stdout)
+        except FileNotFoundError:
+            parser._print_message('Couldn\'t find LICENSE, but you can still ', sys.stdout)
+            parser._print_message('read it here: https://www.gnu.org/licenses/gpl-3.0.txt\n', sys.stdout)
+        finally:
+            parser.exit()
+
 
 if __name__ == '__main__':
-    argparser = argparse.ArgumentParser(prog='CodeDiff', description='A file differencer for use in APCS(P) classes.',
-                                        epilog='''
-                                        \tCodeDiff  Copyright (C)  2018  Daniel Montgomery
-                                        \tThis program comes with ABSOLUTELY NO WARRANTY;
-                                        \tThis is free software, and you are welcome to redistribute it
-                                        \tunder certain conditions; type `--license` for details.
-                                        '''
-                                       ) # TODO fix epilog formatting
-    argparser.add_argument('input_files', nargs='+', help='input files for CodeDiff. Can be files and/or directories.')
-    argparser.add_argument('-V', '--version', action='version', version='CodeDiff v' + __version__)
+    # Initalizes argparser
+    argparser = argparse.ArgumentParser(prog='codediff',
+                                        description='A file differencer for use in APCS(P) classes.',
+                                        formatter_class=argparse.RawDescriptionHelpFormatter,
+                                        epilog=textwrap.indent(textwrap.dedent('''\
+                                        codediff  Copyright (C)  2018  Daniel Montgomery
+                                        This program comes with ABSOLUTELY NO WARRANTY;
+                                        This is free software, and you are welcome to redistribute it
+                                        under certain conditions; type `--license` for details.
+                                        '''), 4 * ' '))
+    argparser.add_argument('input_files', nargs='+',
+                           help='input files for codediff. Can be files and/or directories.')
+    argparser.add_argument('-V', '--version', action='version', version='codediff v' + __version__)
     argparser.add_argument('-l', '--license', action=LicenseAction)
     verbose_group = argparser.add_mutually_exclusive_group()
-    verbose_group.add_argument('-q', '--quiet', help='Only output results', action='store_true')
-    verbose_group.add_argument('-v', '--verbose', help='increase output verbosity', action='store_true')
+    verbose_group.add_argument('-q', '--quiet', help='Only output results.',
+                               action='store_const', dest='log_level', const=logging.ERROR)
+    # Currently, verbosity does nothing.
+    verbose_group.add_argument('-v', '--verbose',
+                           help='increase output verbosity',
+                           action='store_const', dest='log_level', const=logging.INFO)
+    # TODO ensure that the lowest log level is passed when using `-v`, `-q` and `-d`
+    argparser.add_argument('-d', '--debug', help='Print debug statements for developers.',
+                           action='store_const', dest='log_level', const=logging.DEBUG)
     args = argparser.parse_args()
-    # TODO make verbosity and quiet work.
+
+    # Init verbose and logging facilities.
+    _logger = logger.init_logger(args.log_level or logging.INFO)
+
+    # Run the program.
     try:
-        snap_parser = SnapXmlParser(args.input_files)
-        ratios = snap_parser.ratios()
-        # formatter = argparser._get_formatter()
-        for path, path2 in ratios:
-            ratio = ratios[path, path2]
-            print('Compared {} and {}: {}% similar'.format(path, path2, "{0:.2f}".format(float(ratio)*100)))
-            # TODO use parser formatting.
-            # formatter.add_text(str(line[:-1]))
-            # argparser._print_message(formatter.format_help(), sys.stdout)
+        _logger.debug('Creating PathParser instance...')
+        parsed_paths = PathParser(args.input_files, SnapPathValidator()).parse()
+        _logger.debug('Computing compare...')
+        sim = []
+        for _, file_pair in parsesnapfiles(parsed_paths).items():
+            sim.append(SnapMatcher(file_pair.a, file_pair.b).compare())
+        _logger.debug('Found following ratios: %s', sim)
     except (FileError, FileIOError) as e:
         argparser.error(str(e))
+    except Exception as e:
+        _logger.exception('Oh noes! :( An exception has occurred.')
