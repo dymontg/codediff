@@ -5,7 +5,7 @@ import re
 import os
 import sys
 import logging
-import requests
+from urllib import request
 
 from src.utils import UnsupportedFiletypeError
 
@@ -23,13 +23,16 @@ class SnapScraper:
         if type(path) is str:
             _logger.debug('`path` is of type str, converting to list and validating paths.')
             self._validate_paths([path])
+
         for p in self.paths:
             with open(p, 'r') as html:
                 content = html.read()
                 start = content.find('url=')+4 #beginning of link in content
                 end = content.find('<title>')-5 #end of link in content
                 link = (content[start:end])
-            self.data.append(self._get_data(link))
+            data = self._get_data(link)
+            if data:
+                self.data.append(data)
             _logger.debug('========== END `%s::%s::__init__` ==========', __name__, self.__class__.__name__)
 
     def _validate_paths(self, paths):
@@ -61,32 +64,27 @@ class SnapScraper:
         _logger.debug('========== END `%s::%s::_validate_file` ==========', __name__, self.__class__.__name__)
 
     def _get_data (self, link):
-        if (link.find('tinyurl') != -1):
-            tinyurl = requests.head('https://tinyurl.com/gbeakgwrgjweoueghsdkngksdghoiw')
-            return self._get_data(tinyurl.headers['location'])
+        resp = request.urlopen(link)
+        url = resp.geturl()
+        if 'Username' not in url:
+            _logger.info('No snap project found at {}. Ignoring.'.format(link))
         else:
-            user = link[link.find('Username=')+9:link.find('&ProjectName')]
-            project = link[link.find('&ProjectName')+13:len(link)]
+            user = url[url.find('Username=')+9:url.find('&ProjectName')]
+            project = url[url.find('&ProjectName')+13:len(url)]
             return ([user, project])
 
     def scrape(self):
-        current_path = os.getcwd()
+        paths = []
         try:
-            os.mkdir(current_path + '/results')
-        except Exception as e:
-            _logger.info('Already a folder, dumping files in that one.')
+            os.mkdir('canvas_files')
+        except FileExistsError:
+            _logger.info('Canvas output folder already exists, overwriting old files.')
         for d in self.data:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.13; rv:63.0) Gecko/20100101 Firefox/63.0',
-                'Accept': '*/*',
-                'Prefer': 'safe',
-                'Referer': 'https://snap.berkeley.edu/snapsource/snap.html',
-                'Content-Type': 'application/json; charset=utf-8',
-                'Origin': 'https://snap.berkeley.edu',
-                'Connection': 'keep-alive',
-                'TE': 'Trailers',
-            }
-            response = requests.get('https://cloud.snap.berkeley.edu/projects/' + d[0] + '/' + d[1], headers=headers)
-            with open('results/' + d[0] + d[1] + '.xml', 'w+') as newfile:
-                newfile.write(response.text)
+            # TODO get this path from the html file.
+            path = 'canvas_files/' + d[0] + d[1] + '.xml'
+            response = request.urlopen('https://cloud.snap.berkeley.edu/projects/' + d[0] + '/' + d[1])
+            with open(path, 'w+') as newfile:
+                newfile.write(response.read().decode('utf-8'))
+            paths.append(path)
         _logger.debug('Finished with scrape.')
+        return paths

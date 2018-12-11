@@ -24,6 +24,7 @@ import argparse
 import logging
 import sys
 import textwrap
+from src.scraper import SnapScraper
 from src.parser import SnapXmlParser
 from src import logger
 from src.utils import FileError, FileIOError, sdv
@@ -31,7 +32,7 @@ from src.utils import FileError, FileIOError, sdv
 class LicenseAction(argparse.Action):
     def __init__(self, option_strings, dest=argparse.SUPPRESS,
                  default=argparse.SUPPRESS,
-                 help='Show CodeDiff\'s license and exit.'):
+                 help='Show codediff\'s license and exit'):
         super(LicenseAction, self).__init__(option_strings=option_strings,
                                             dest=dest,
                                             default=default,
@@ -61,20 +62,22 @@ if __name__ == '__main__':
                                         This is free software, and you are welcome to redistribute it
                                         under certain conditions; type `--license` for details.
                                         '''), 4 * ' '))
-    argparser.add_argument('input_files', nargs='+',
-                           help='input files for codediff. Can be files and/or directories.')
+    argparser.add_argument('input_files', nargs='*', type=str, default=None,
+                           help='input files for codediff. Can be files and/or directories')
     argparser.add_argument('-V', '--version', action='version', version='codediff v' + __version__)
     argparser.add_argument('-l', '--license', action=LicenseAction)
     verbose_group = argparser.add_mutually_exclusive_group()
-    verbose_group.add_argument('-q', '--quiet', help='Only output results.',
+    verbose_group.add_argument('-q', '--quiet', help='Only output results',
                                action='store_const', dest='log_level', const=logging.ERROR)
     # Currently, verbosity does nothing.
     verbose_group.add_argument('-v', '--verbose',
-                           help='increase output verbosity',
-                           action='store_const', dest='log_level', const=logging.INFO)
-    # TODO ensure that the lowest log level is passed when using `-v`, `-q` and `-d`
-    argparser.add_argument('-d', '--debug', help='Print debug statements for developers.',
-                           action='store_const', dest='log_level', const=logging.DEBUG)
+                               help='increase output verbosity',
+                               action='store_const', dest='log_level', const=logging.INFO)
+    verbose_group.add_argument('-d', '--debug', help='Print debug statements for developers',
+                               action='store_const', dest='log_level', const=logging.DEBUG)
+    argparser.add_argument('--canvas', nargs='*', type=str, default=None,
+                           help='input files from canvas .html files')
+
     args = argparser.parse_args()
 
     # Init verbose and logging facilities.
@@ -82,6 +85,17 @@ if __name__ == '__main__':
 
     # Run the program.
     try:
+        # First we scrape the canvas html files if they exist.
+        if args.canvas:
+            _logger.debug('Creating HtmlParser instance.')
+            scraper = SnapScraper(args.canvas)
+            _logger.debug('Scraping files.')
+            paths = scraper.scrape()
+            # Next we add all the scraped files to the compare.
+            # TODO parse the xml files and remove unnecessary elements.
+            args.input_files += paths
+
+        # Finally we compare all the files.
         _logger.debug('Creating SnapXmlParser instance...')
         snap_parser = SnapXmlParser(args.input_files)
         _logger.debug('Computing ratios...')
