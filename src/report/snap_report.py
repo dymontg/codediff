@@ -144,8 +144,10 @@ class SnapBlock:
 
 
 class SnapVariable:
-    def __init__(self, name):
-        self.name = name
+    def __init__(self, **kwargs):
+        dict_verify(kwargs, ('name', 'transient="false"'))
+        self.name = kwargs['name']
+        self.transient = kwargs['transient']
 
     def iterelems(self):
         yield from self.__dict__.items()
