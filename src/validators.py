@@ -2,10 +2,12 @@
     See codediff executable for copyright disclaimer.
 """
 
-import re, os, logging
-from src.utils import UnsupportedFiletypeError, NotEnoughFilesError
+import re
+import logging
+from src.utils import UnsupportedFiletypeError
 
 _logger = logging.getLogger('codediff')
+
 
 class PathValidator:
     def validate_dir(self, file_paths):
@@ -16,21 +18,25 @@ class PathValidator:
         _logger.warning('This validator does nothing. Use a subclass such as `XmlPathValidator`')
         pass
 
+    def _validate_path_extension(self, path, exe):
+        if not path.endswith(exe):
+            raise UnsupportedFiletypeError('{} is not an supported {} file type. Aborting.'.format(path, exe[1:]))
+
+    def _find_files_by_extension(self, file_paths, exe):
+        filename_paths = [x for x in file_paths if x.endswith(exe)]
+        _logger.debug('Found following %s files: %s', exe, filename_paths)
+        for filename_path in filename_paths:
+            self.validate_file(filename_path)
+        return filename_paths
+
+
 class XmlPathValidator(PathValidator):
     def validate_file(self, path):
-        _logger.debug('========== BEGIN `%s::%s::validate_file` ==========', __name__, self.__class__.__name__)
-        _logger.debug('Validating %s has `.xml` extension', path)
-        if not path.endswith('.xml'):
-            raise UnsupportedFiletypeError('{} is not an supported xml file type. Aborting.'.format(path))
-        _logger.debug('========== END `%s::%s::validate_file` ==========', __name__, self.__class__.__name__)
+        self._validate_path_extension(path, '.xml')
         return path
 
     def validate_dir(self, file_paths):
-        xml_filename_paths = [x for x in file_paths if x.endswith('.xml')]
-        _logger.debug('Found following xml files: %s', xml_filename_paths)
-        for filename_path in xml_filename_paths:
-            self.validate_file(filename_path)
-        return xml_filename_paths
+        return self._find_files_by_extension(file_paths, '.xml')
 
 
 class SnapPathValidator(XmlPathValidator):
@@ -49,3 +55,12 @@ class SnapPathValidator(XmlPathValidator):
                 raise UnsupportedFiletypeError('{} is not a supported snap xml. Aborting.'.format(path))
         _logger.debug('========== END `%s::%s::validate_file` ==========', __name__, self.__class__.__name__)
         return path
+
+
+class HtmlPathValidator(PathValidator):
+    def validate_file(self, path):
+        self._validate_path_extension(path, '.html')
+        return path
+
+    def validate_dir(self, file_paths):
+        return self._find_files_by_extension(file_paths, '.html')

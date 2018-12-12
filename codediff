@@ -29,7 +29,7 @@ from src import logger
 from src.scraper import CanvasScraper
 from src.parser import PathParser, parsesnapfiles
 from src.matcher import SnapMatcher
-from src.validators import SnapPathValidator
+from src.validators import SnapPathValidator, HtmlPathValidator
 from src.utils import FileError, FileIOError
 
 
@@ -100,8 +100,10 @@ if __name__ == '__main__':
         # First we scrape the canvas html files if they exist.
         if args.canvas:
             _logger.debug('Creating CanvasScraper instance.')
-            scraper = CanvasScraper(args.canvas)
+            parsed_paths = PathParser(args.canvas, HtmlPathValidator()).parse()
+            scraper = CanvasScraper(parsed_paths)
             _logger.debug('Scraping files.')
+            scraper.parse_html()
             paths = scraper.scrape()
             # Next we add all the scraped files to the compare.
             # TODO parse the xml files and remove unnecessary elements.

@@ -1,90 +1,62 @@
 """ CodeDiff - A file differencer for use in APCS(P) classes.
     See codediff executable for copyright disclaimer.
 """
-import re
 import os
-import sys
 import logging
+import sys
 from urllib import request
-
-from src.utils import UnsupportedFiletypeError
+from src.utils import Pair
 
 _logger = logging.getLogger('codediff')
 
-class CanvasScraper:
-    def __init__(self, path):
-        _logger.debug('========== BEGIN `%s::%s::__init__` ==========', __name__, self.__class__.__name__)
-        _logger.debug('Instantiating `HtmlParser` with argument `path`: %s.', path)
-        self.paths = []
-        self.data = []
-        if type(path) is list:
-            _logger.debug('`path` is of type list, validating paths.')
-            self._validate_paths(path)
-        if type(path) is str:
-            _logger.debug('`path` is of type str, converting to list and validating paths.')
-            self._validate_paths([path])
 
-        for p in self.paths:
-            with open(p, 'r') as html:
+class CanvasScraper:
+    def __init__(self, paths):
+        self.paths = paths
+        self.data = {}
+
+    def parse_html(self):
+        for i, path in enumerate(self.paths):
+            sys.stdout.write('\rParsing {} \t({}/{})'.format(path, i, len(self.paths)))
+            sys.stdout.flush()
+            with open(path, 'r') as html:
                 content = html.read()
-                start = content.find('url=')+4 #beginning of link in content
-                end = content.find('<title>')-5 #end of link in content
+                start = content.find('url=')+4 # beginning of link in content
+                end = content.find('<title>')-5 # end of link in content
                 link = (content[start:end])
             data = self._get_data(link)
             if data:
-                self.data.append(data)
-            _logger.debug('========== END `%s::%s::__init__` ==========', __name__, self.__class__.__name__)
+                self.data[path] = data
 
-    def _validate_paths(self, paths):
-        _logger.debug('========== BEGIN `%s::%s::_validate_paths` ==========', __name__, self.__class__.__name__)
-        _logger.debug('Validating paths %s', paths)
-        for path in paths:
-            if os.path.isfile(path):
-                _logger.debug('%s is a file', path)
-                self._validate_file(path)
-                self.paths.append(path)
-            elif os.path.isdir(path):
-                _logger.debug('%s is a directory', path)
-                path = path.rstrip('/') # Will only work on unix, use os.path.normalpath for windows.
-                filename_paths = [root + '/' + x for root, _, files_list in os.walk(path) for x in files_list]
-                html_filename_paths = [x for x in filename_paths if x.endswith('.html')]
-                _logger.debug('Found %s in `%s`', filename_paths, path)
-                _logger.debug('Found following html files: %s', html_filename_paths)
-                for filename_path in html_filename_paths:
-                    self._validate_file(filename_path)
-                    self.paths.append(filename_path)
-            else:
-                raise FileNotFoundError('Could not find file {}. Aborting.'.format(path))
-
-    def _validate_file(self, path):
-        _logger.debug('========== BEGIN `%s::%s::_validate_file` ==========', __name__, self.__class__.__name__)
-        _logger.debug('Validating %s has `.html` extension', path)
-        if not path.endswith('.html'):
-            raise UnsupportedFiletypeError('{} is not an supported html file type. Aborting.'.format(path))
-        _logger.debug('========== END `%s::%s::_validate_file` ==========', __name__, self.__class__.__name__)
-
-    def _get_data (self, link):
+    def _get_data(self, link):
         resp = request.urlopen(link)
         url = resp.geturl()
         if 'Username' not in url:
-            _logger.info('No snap project found at {}. Ignoring.'.format(link))
+            _logger.info('\nNo snap project found at %s. Ignoring.', link)
         else:
             user = url[url.find('Username=')+9:url.find('&ProjectName')]
-            project = url[url.find('&ProjectName')+13:len(url)]
-            return ([user, project])
+            project = url[url.find('&ProjectName')+13:]
+            return Pair(user, project)
 
     def scrape(self):
         paths = []
         try:
             os.mkdir('canvas_files')
         except FileExistsError:
-            _logger.info('Canvas output folder already exists, overwriting old files.')
-        for d in self.data:
-            # TODO get this path from the html file.
-            path = 'canvas_files/' + d[0] + d[1] + '.xml'
-            response = request.urlopen('https://cloud.snap.berkeley.edu/projects/' + d[0] + '/' + d[1])
-            with open(path, 'w+') as newfile:
-                newfile.write(response.read().decode('utf-8'))
-            paths.append(path)
+            _logger.info('\nCanvas output folder already exists, overwriting old files.')
+        for i, tupl in enumerate(self.data.items()):
+            path = tupl[0]
+            data = tupl[1]
+            ofile_path = 'canvas_files/' + os.path.basename(path).replace('.html', '.xml')
+            response = request.urlopen('https://cloud.snap.berkeley.edu/projects/' + data[0] + '/' + data[1])
+            sys.stdout.write('\rScraping {} \t({}/{})'.format(path, i, len(self.paths)))
+            sys.stdout.flush()
+            with open(ofile_path, 'w+') as ofile:
+                rdata = response.read().decode('utf-8')
+                # Spaghetti code, but whatever.
+                _, rdata = rdata.split('<snapdata>')
+                rdata, _ = rdata.rsplit('<media')
+                ofile.write(rdata)
+            paths.append(ofile_path)
         _logger.debug('Finished with scrape.')
         return paths
