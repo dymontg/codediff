@@ -11,7 +11,7 @@ from src.utils import UnsupportedFiletypeError
 
 _logger = logging.getLogger('codediff')
 
-class SnapScraper:
+class CanvasScraper:
     def __init__(self, path):
         _logger.debug('========== BEGIN `%s::%s::__init__` ==========', __name__, self.__class__.__name__)
         _logger.debug('Instantiating `HtmlParser` with argument `path`: %s.', path)

@@ -13,7 +13,7 @@
     GNU General Public License for more details.
 """
 
-__version__ = '0.0.1'
+__version__ = '0.0.2-develop'
 
 __author__ = 'Daniel Montgomery'
 __copyright__ = 'Copyright (C) 2018 Daniel Montgomery'
@@ -23,11 +23,22 @@ __license__ = 'GPLv3'
 import argparse
 import logging
 import sys
+import subprocess
 import textwrap
-from src.scraper import SnapScraper
-from src.parser import SnapXmlParser
 from src import logger
-from src.utils import FileError, FileIOError, sdv
+from src.scraper import CanvasScraper
+from src.parser import PathParser, parsesnapfiles
+from src.matcher import SnapMatcher
+from src.validators import SnapPathValidator
+from src.utils import FileError, FileIOError
+
+
+if 'develop' in __version__:
+    p = subprocess.Popen(['git', 'rev-parse', 'HEAD'], stdout=subprocess.PIPE)
+    resp, retcode = p.communicate()
+    if retcode is None:
+        __version__ += ' ({})'.format(resp.rstrip().decode('ascii'))
+
 
 class LicenseAction(argparse.Action):
     def __init__(self, option_strings, dest=argparse.SUPPRESS,
@@ -50,6 +61,7 @@ class LicenseAction(argparse.Action):
             parser._print_message('read it here: https://www.gnu.org/licenses/gpl-3.0.txt\n', sys.stdout)
         finally:
             parser.exit()
+
 
 if __name__ == '__main__':
     # Initalizes argparser
@@ -87,8 +99,8 @@ if __name__ == '__main__':
     try:
         # First we scrape the canvas html files if they exist.
         if args.canvas:
-            _logger.debug('Creating HtmlParser instance.')
-            scraper = SnapScraper(args.canvas)
+            _logger.debug('Creating CanvasScraper instance.')
+            scraper = CanvasScraper(args.canvas)
             _logger.debug('Scraping files.')
             paths = scraper.scrape()
             # Next we add all the scraped files to the compare.
@@ -96,19 +108,14 @@ if __name__ == '__main__':
             args.input_files += paths
 
         # Finally we compare all the files.
-        _logger.debug('Creating SnapXmlParser instance...')
-        snap_parser = SnapXmlParser(args.input_files)
-        _logger.debug('Computing ratios...')
-        ratios = snap_parser.ratios()
-        # formatter = argparser._get_formatter()
-        for path_pair, ratio in sdv(ratios):
-            print('Compared {} and {}: {}% similar'.format(path_pair[0], path_pair[1],
-                                                           round(float(ratio)*100, 1)))
-        # TODO use parser formatting.
-        # formatter.add_text(str(line[:-1]))
-        # argparser._print_message(formatter.format_help(), sys.stdout)
-
+        _logger.debug('Creating PathParser instance...')
+        parsed_paths = PathParser(args.input_files, SnapPathValidator()).parse()
+        _logger.debug('Computing compare...')
+        sim = []
+        for _, file_pair in parsesnapfiles(parsed_paths).items():
+            sim.append(SnapMatcher(file_pair.a, file_pair.b).compare())
+        _logger.debug('Found following ratios: %s', sim)
     except (FileError, FileIOError) as e:
         argparser.error(str(e))
-    except Exception as e:
+    except Exception:
         _logger.exception('Oh noes! :( An exception has occurred.')
