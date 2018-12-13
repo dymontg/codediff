@@ -5,6 +5,7 @@ import re
 import logging
 from xml.dom.minidom import parse as xmlparse
 
+
 class FileError(Exception):
     pass
 
@@ -39,6 +40,7 @@ class Pair:
             return self.a
         return self.b
 
+
 def prettyformatxml(path, encoding=None):
     """
     Takes a one line xml file and splits it into many.
@@ -61,10 +63,23 @@ def prettyfilexml(path, encoding=None):
     with open(path, 'wb') as xml:
         xml.write(xml_str)
 
+
+def dict_verify(dictionary, kws):
+    pure_kws = [x.split('=')[0] if '=' in x else x for x in kws]
+    # First we check for default values
+    for item in [x for x in kws if '=' in x]:
+        key, value = item.split('=')
+        dictionary[key] = value
+
+    # Then we verify that the dictionary has the proper values
+    for key, _ in dictionary.items():
+        if key not in pure_kws:
+            raise ValueError('Key `{}` not in acceptable keywords.'.format(key))
+
+
 def sdv(d, reverse=False):
     """Sort a dictionary by value and return a representation
     of it as a list.
-
     :param d: the dictionary to sort
     :param reverse: whether to reverse the order. Default is false.
     :returns: a sorted list.

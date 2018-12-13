@@ -26,20 +26,20 @@ Great! Let's move on. &#128077; <!--clapping hands-->
 
 ## Usage
 
-Instead of running CodeDiff via `python3 codediff.py`, run the executable
+Instead of running codediff via `python3 codediff.py`, run the executable
 `./codediff`.
-<!--Also, calling `./install` will install CodeDiff for the current user and
+<!--Also, calling `./install` will install codediff for the current user and
 add the startup executable to `PATH`.-->
 
 **Note: Currently, only APCSP Snap! xml files are supported.**
 
 ## TODO
 
-- [ ] 0.0.2: Add .java and .cpp files for APCS classes.
-- [ ] 0.0.2: Add statistical analysis
-- [ ] 0.0.2: Install CodeDiff globably
+- [ ] 0.0.4: Add .java and .cpp files for APCS classes.
+- [ ] 0.0.3: Add statistical analysis
+- [X] 0.0.2: Install codediff globably
 - [ ] 1.0.0: Add Python2 compatability
 
 ## License
 
-codediff is licensed under GNU GPLv3.0. See [LICENSE]() to see the full text.
+codediff is licensed under GNU GPLv3.0. See [LICENSE](https://github.com/dmontgrmry/codediff/blob/master/LICENSE) to see the full text.
