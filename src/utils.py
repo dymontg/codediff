@@ -86,3 +86,12 @@ def dict_verify(dictionary, kws):
     for key, _ in dictionary.items():
         if key not in pure_kws:
             raise ValueError('Key `{}` not in acceptable keywords.'.format(key))
+
+def sdv(d, reverse=False):
+    """Sort a dictionary by value and return a representation
+    of it as a list.
+    :param d: the dictionary to sort
+    :param reverse: whether to reverse the order. Default is false.
+    :returns: a sorted list.
+    """
+    return sorted(d.items(), key=lambda t: t[1], reverse=reverse)
