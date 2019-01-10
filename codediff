@@ -97,6 +97,7 @@ if __name__ == '__main__':
 
     # Run the program.
     try:
+        failed_paths = []
         # First we scrape the canvas html files if they exist.
         if args.canvas:
             _logger.debug('Creating CanvasScraper instance.')
@@ -104,18 +105,22 @@ if __name__ == '__main__':
             scraper = CanvasScraper(parsed_paths)
             _logger.debug('Scraping files.')
             scraper.parse_html()
-            paths = scraper.scrape()
+            canvas_paths = scraper.scrape()
             # Next we add all the scraped files to the compare.
-            # TODO parse the xml files and remove unnecessary elements.
-            args.input_files += paths
+            args.input_files += canvas_paths['succeeded']
+            failed_paths += canvas_paths['failed']
 
         # Finally we compare all the files.
         _logger.debug('Creating PathParser instance...')
         parsed_paths = PathParser(args.input_files, SnapPathValidator()).parse()
         _logger.debug('Computing compare...')
         sim = []
-        for _, file_pair in parsesnapfiles(parsed_paths).items():
+        parsed_files = parsesnapfiles(parsed_paths)
+        failed_paths += parsed_files['failed']
+        for _, file_pair in parsed_files['succeeded'].items():
             sim.append(SnapMatcher(file_pair.a, file_pair.b).compare())
+        if failed_paths:
+            _logger.info('Failed to read the following files: %s', failed_paths)
         _logger.debug('Found following ratios: %s', sim)
     except (FileError, FileIOError) as e:
         argparser.error(str(e))

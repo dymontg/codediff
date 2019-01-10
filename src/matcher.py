@@ -6,7 +6,6 @@ import logging
 import difflib
 import itertools
 import inspect
-# from statistics import mean
 
 _logger = logging.getLogger('codediff')
 
@@ -62,7 +61,7 @@ class SnapMatcher(BaseMatcher):
 
         # Compare the elements
         sentinel = ('\0', '\0')
-        _logger.debug('REPORT %s', self.report1.name, self.report2.name)
+        _logger.debug('REPORT %s, %s', self.report1.name, self.report2.name)
         if self._cmp(self.report1.name, self.report2.name):
             diff_ratio += inc_rate
 
