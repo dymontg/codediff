@@ -30,7 +30,7 @@ from src.scraper import CanvasScraper
 from src.parser import PathParser, parsesnapfiles
 from src.matcher import SnapMatcher
 from src.validators import SnapPathValidator, HtmlPathValidator
-from src.utils import FileError, FileIOError
+from src.utils import FileError, FileIOError, sdv
 
 
 if 'develop' in __version__:
@@ -114,11 +114,16 @@ if __name__ == '__main__':
         _logger.debug('Creating PathParser instance...')
         parsed_paths = PathParser(args.input_files, SnapPathValidator()).parse()
         _logger.debug('Computing compare...')
-        sim = []
+        sim = {}
         parsed_files = parsesnapfiles(parsed_paths)
         failed_paths += parsed_files['failed']
         for _, file_pair in parsed_files['succeeded'].items():
-            sim.append(SnapMatcher(file_pair.a, file_pair.b).compare())
+            sim[file_pair] = SnapMatcher(file_pair.a, file_pair.b).compare()
+        _logger.info('\n')
+
+        # Then we sort and print the result and and errors that may have occurred.
+        for file_pair, ratio in sdv(sim):
+            _logger.info('%s - %d%% similar', file_pair, round(float(ratio)*100, 1))
         if failed_paths:
             _logger.info('Failed to read the following files: %s', failed_paths)
         _logger.debug('Found following ratios: %s', sim)

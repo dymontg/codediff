@@ -58,8 +58,7 @@ class CanvasScraper:
                 _logger.info('\nError in scraping %s; %d %s. Skipping.', path, err.code, err.reason)
                 self.failure_parsed.append(path)
                 continue
-            sys.stdout.write('\rScraping {} \t({}/{})'.format(path, i, len(self.paths) - len(self.failure_parsed)))
-            sys.stdout.flush()
+            _logger.info('\rScraping %s \t(%d/%d)', path, i, len(self.paths) - len(self.failure_parsed), extra={'terminator': ''})
             with open(ofile_path, 'w+') as ofile:
                 rdata = response.read().decode('utf-8')
                 # Spaghetti code, but whatever.
@@ -67,8 +66,7 @@ class CanvasScraper:
                 rdata, _ = rdata.rsplit('<media')
                 ofile.write(rdata)
             self.succesfully_parsed.append(ofile_path)
-        _logger.debug('Finished with scrape.')
-        sys.stdout.write('\n')
+        _logger._info('\n')
         return {
             'succeeded': self.succesfully_parsed,
             'failed': self.failure_parsed

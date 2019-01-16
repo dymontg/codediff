@@ -27,9 +27,18 @@ Great! Let's move on. &#128077; <!--clapping hands-->
 ## Usage
 
 Instead of running codediff via `python3 codediff.py`, run the executable
-`./codediff`.
-<!--Also, calling `./install` will install codediff for the current user and
-add the startup executable to `PATH`.-->
+`./codediff`. To compare files and/or directories, simply append them to the end
+of the executable in the console. For example, running `./codediff snap_files/`
+would compare all the snap files in `snap_files`.
+
+Additionally, codediff can scrape files off of canvas LMS. Simply tell codediff where
+the canvas-generated html redirect files are with the `--canvas` argument. For example,
+run `./codediff --canvas canvas_html_files/`.
+
+Checkout the help (`./codediff --help`) for further reading.
+
+Also, calling `./install` will install codediff for the current user and
+add the startup executable to `PATH`.
 
 **Note: Currently, only APCSP Snap! xml files are supported.**
 
