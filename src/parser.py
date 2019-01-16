@@ -5,6 +5,7 @@
 import os
 import logging
 import xml.etree.ElementTree as et
+from xml.etree.ElementTree import ParseError
 from src.validators import PathValidator
 from src.report import FileReport
 from src.report.snap_report import SnapReport
@@ -38,11 +39,17 @@ def parsefiles(parsed_paths):
 
 
 def parsesnapfiles(parsed_paths):
-    files = {}
+    files = {
+        'succeeded': {},
+        'failed': set()
+    }
     for i, path1 in enumerate(parsed_paths):
-        parsed_file1 = SnapParser(path1).parse()
-        for path2 in parsed_paths[i+1:]:
-            files[Pair(path1, path2)] = Pair(parsed_file1, SnapParser(path2).parse())
+        try:
+            parsed_file1 = SnapParser(path1).parse()
+            for path2 in parsed_paths[i+1:]:
+                files['succeeded'][Pair(path1, path2)] = Pair(parsed_file1, SnapParser(path2).parse())
+        except ParseError as e:
+            files['failed'] |= {e.filename}
     return files
 
 
@@ -51,15 +58,20 @@ class SnapParser(FileParser):
         super(SnapParser, self).__init__(path)
 
     def parse(self):
-        project = et.parse(self.path).getroot()
-        name = project.attrib['name']
-        stage = project.find('stage')
-        blocks = project.find('blocks')
-        custom_vars = project.find('variables')
+        try:
+            project = et.parse(self.path).getroot()
+            name = project.attrib['name']
+            stage = project.find('stage')
+            blocks = project.find('blocks')
+            custom_vars = project.find('variables')
 
-        return SnapReport(self.path, project=project,
-                          name=name, stage=stage, blocks=blocks,
-                          vars=custom_vars)
+            return SnapReport(self.path, project=project,
+                            name=name, stage=stage, blocks=blocks,
+                            vars=custom_vars)
+        except ParseError as e:
+            # overwrite the filename and re-raise the error
+            e.filename = self.path
+            raise e
 
 
 class PathParser:

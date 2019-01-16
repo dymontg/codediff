@@ -27,6 +27,7 @@ class TerminatorStreamHandler(logging.StreamHandler):
         if 'terminator' in record.__dict__:
             self.terminator = record.__dict__['terminator']
         super(TerminatorStreamHandler, self).emit(record)
+        self.flush()
         self.terminator = '\n'
 
 class LeveledStreamHandler(TerminatorStreamHandler):

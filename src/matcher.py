@@ -6,7 +6,6 @@ import logging
 import difflib
 import itertools
 import inspect
-# from statistics import mean
 
 _logger = logging.getLogger('codediff')
 
@@ -31,7 +30,7 @@ class SequenceMatcher(BaseMatcher):
         # and append it to a diff ratio array.
         diff_ratios = []
         _logger.debug('========== BEGIN `%s::%s::ratio` ==========', __name__, self.__class__.__name__)
-        _logger.info('Comparing %s and %s.......', self.report1, self.report2, extra={'terminator': ''})
+        _logger.info('\rComparing %s and %s', self.report1, self.report2, extra={'terminator': ''})
         # for character_seq, character_seq_2 in zip(self.report1.content, self.report2.content):
         character_seq = self.report1.content
         character_seq_2 = self.report2.content
@@ -41,7 +40,6 @@ class SequenceMatcher(BaseMatcher):
         # The next line is where we would determine the actual diff ratio
         # if the file was fragmented.
         diff_ratio = diff_ratios[0]
-        _logger.info('DONE - %d%% similar', round(float(diff_ratio)*100, 1))
         _logger.debug('========== END `%s::%s::ratio` ==========', __name__, self.__class__.__name__)
         return diff_ratio
 
@@ -58,11 +56,11 @@ class SnapMatcher(BaseMatcher):
                           self.report2.elems() - len(self._blacklisted_keys))
         inc_rate = 1.0 / total_elems
         _logger.debug('Found %d elements; increment rate is %f', total_elems, inc_rate)
-        _logger.info('Comparing %s and %s.......', self.report1, self.report2, extra={'terminator': ''})
+        _logger.info('\rComparing %s and %s', self.report1, self.report2, extra={'terminator': ''})
 
         # Compare the elements
         sentinel = ('\0', '\0')
-        _logger.debug('REPORT %s', self.report1.name, self.report2.name)
+        _logger.debug('REPORT %s, %s', self.report1.name, self.report2.name)
         if self._cmp(self.report1.name, self.report2.name):
             diff_ratio += inc_rate
 
@@ -96,7 +94,6 @@ class SnapMatcher(BaseMatcher):
                 diff_ratio += inc_rate
 
         # Divide the number of shared elements by the total.
-        _logger.info('DONE - %d%% similar', round(float(diff_ratio)*100, 1))
         return diff_ratio
 
     def _similar(self, val1, val2, thresh):
