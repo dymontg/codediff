@@ -66,7 +66,7 @@ class CanvasScraper:
                 rdata, _ = rdata.rsplit('<media')
                 ofile.write(rdata)
             self.succesfully_parsed.append(ofile_path)
-        _logger._info('\n')
+        _logger.info('\n')
         return {
             'succeeded': self.succesfully_parsed,
             'failed': self.failure_parsed
