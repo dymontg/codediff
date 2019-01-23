@@ -27,10 +27,10 @@ import subprocess
 import textwrap
 from src import logger
 from src.scraper import CanvasScraper
-from src.parser import PathParser, parsesnapfiles
-from src.matcher import SnapMatcher
-from src.validators import SnapPathValidator, HtmlPathValidator
-from src.utils import FileError, FileIOError, sdv
+from src.parser import PathParser, parsesnapfiles, parsefiles
+from src.matcher import SnapMatcher, SequenceMatcher
+from src.validators import SnapPathValidator, HtmlPathValidator, JavaPathValidator
+from src.utils import FileError, NotEnoughFilesError, FileIOError, sdv
 
 
 if 'develop' in __version__:
@@ -63,6 +63,11 @@ class LicenseAction(argparse.Action):
             parser.exit()
 
 
+def print_results(sim, logger):
+    for file_pair, ratio in sdv(sim):
+        logger.info('%s - %d%% similar', file_pair, round(float(ratio)*100, 1))
+    logger.debug('Found following ratios: %s', sim)
+
 if __name__ == '__main__':
     # Initalizes argparser
     argparser = argparse.ArgumentParser(prog='codediff',
@@ -74,7 +79,7 @@ if __name__ == '__main__':
                                         This is free software, and you are welcome to redistribute it
                                         under certain conditions; type `--license` for details.
                                         '''), 4 * ' '))
-    argparser.add_argument('input_files', nargs='*', type=str, default=None,
+    argparser.add_argument('input_files', nargs='+',
                            help='input files for codediff. Can be files and/or directories')
     argparser.add_argument('-V', '--version', action='version', version='codediff v' + __version__)
     argparser.add_argument('-l', '--license', action=LicenseAction)
@@ -87,9 +92,6 @@ if __name__ == '__main__':
                                action='store_const', dest='log_level', const=logging.INFO)
     verbose_group.add_argument('-d', '--debug', help='Print debug statements for developers',
                                action='store_const', dest='log_level', const=logging.DEBUG)
-    argparser.add_argument('--canvas', nargs='*', type=str, default=None,
-                           help='input files from canvas .html files')
-
     args = argparser.parse_args()
 
     # Init verbose and logging facilities.
@@ -98,35 +100,58 @@ if __name__ == '__main__':
     # Run the program.
     try:
         failed_paths = []
-        # First we scrape the canvas html files if they exist.
-        if args.canvas:
+
+        # First we parse the paths.
+        _logger.debug('Creating PathParser instances...')
+        snap_parsed_paths = PathParser(args.input_files, SnapPathValidator()).parse()
+        java_parsed_paths = PathParser(list(filter(lambda x : x not in snap_parsed_paths, args.input_files)),
+                                        JavaPathValidator()).parse()
+        canvas_parsed_paths = PathParser(list(filter(lambda x : x not in snap_parsed_paths
+                                                        and x not in java_parsed_paths, args.input_files)),
+                                            HtmlPathValidator()).parse()
+        if canvas_parsed_paths:
+            # Then we scrape the canvas html files if they exist.
             _logger.debug('Creating CanvasScraper instance.')
-            parsed_paths = PathParser(args.canvas, HtmlPathValidator()).parse()
-            scraper = CanvasScraper(parsed_paths)
+            scraper = CanvasScraper(canvas_parsed_paths)
             _logger.debug('Scraping files.')
             scraper.parse_html()
             canvas_paths = scraper.scrape()
             # Next we add all the scraped files to the compare.
-            args.input_files += canvas_paths['succeeded']
+            # TODO: scrape java as well
+            snap_parsed_paths += canvas_paths['succeeded']
             failed_paths += canvas_paths['failed']
 
+        # We check that there are enough files.
+        if len(snap_parsed_paths) < 2 and len(java_parsed_paths) < 2:
+            raise NotEnoughFilesError('Expecting at least two xml files but found less than two.')
+
         # Finally we compare all the files.
-        _logger.debug('Creating PathParser instance...')
-        parsed_paths = PathParser(args.input_files, SnapPathValidator()).parse()
         _logger.debug('Computing compare...')
-        sim = {}
-        parsed_files = parsesnapfiles(parsed_paths)
-        failed_paths += parsed_files['failed']
-        for _, file_pair in parsed_files['succeeded'].items():
-            sim[file_pair] = SnapMatcher(file_pair.a, file_pair.b).compare()
-        _logger.info('\n')
+        snap_sim = {}
+        # Comparing snap files
+        if snap_parsed_paths:
+            parsed_files = parsesnapfiles(snap_parsed_paths)
+            failed_paths += parsed_files['failed']
+            for _, file_pair in parsed_files['succeeded'].items():
+                snap_sim[file_pair] = SnapMatcher(file_pair.a, file_pair.b).compare()
+            _logger.info('\n')
+
+        java_sim = {}
+        # Comparing java files
+        if java_parsed_paths:
+            parsed_files = parsefiles(java_parsed_paths)
+            failed_paths += parsed_files['failed']
+            for _, file_pair in parsed_files['succeeded'].items():
+                java_sim[file_pair] = SequenceMatcher(file_pair.a, file_pair.b).compare()
+            _logger.info('\n')
 
         # Then we sort and print the result and and errors that may have occurred.
-        for file_pair, ratio in sdv(sim):
-            _logger.info('%s - %d%% similar', file_pair, round(float(ratio)*100, 1))
+        print_results(snap_sim, _logger)
+        print_results(java_sim, _logger)
+
         if failed_paths:
             _logger.info('Failed to read the following files: %s', failed_paths)
-        _logger.debug('Found following ratios: %s', sim)
+
     except (FileError, FileIOError) as e:
         argparser.error(str(e))
     except Exception:

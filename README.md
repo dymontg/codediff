@@ -31,20 +31,24 @@ Instead of running codediff via `python3 codediff.py`, run the executable
 of the executable in the console. For example, running `./codediff snap_files/`
 would compare all the snap files in `snap_files`.
 
-Additionally, codediff can scrape files off of canvas LMS. Simply tell codediff where
-the canvas-generated html redirect files are with the `--canvas` argument. For example,
-run `./codediff --canvas canvas_html_files/`.
+codediff can scrape files off of canvas LMS. Simply tell codediff where
+the canvas-generated html redirect files using the same sytax as above. For example,
+run `./codediff canvas_html_files/`.
+
+Additionally, codediff can compare java source code files. Simply tell codediff where the
+.java files are the same way as before: `./codediff java_files/`.
+
+Finally, you can mix xml files, java files, and scraping files from canvas. codediff will do
+all the heavy lifting for you.
 
 Checkout the help (`./codediff --help`) for further reading.
 
 Also, calling `./install` will install codediff for the current user and
 add the startup executable to `PATH`.
 
-**Note: Currently, only APCSP Snap! xml files are supported.**
-
 ## TODO
 
-- [ ] 0.0.4: Add .java and .cpp files for APCS classes.
+- [X] 0.0.4: Add .java files for APCS classes.
 - [ ] 0.0.3: Add statistical analysis
 - [X] 0.0.2: Install codediff globably
 - [ ] 1.0.0: Add Python2 compatability

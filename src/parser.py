@@ -9,7 +9,7 @@ from xml.etree.ElementTree import ParseError
 from src.validators import PathValidator
 from src.report import FileReport
 from src.report.snap_report import SnapReport
-from src.utils import NotEnoughFilesError, Pair
+from src.utils import Pair
 
 _logger = logging.getLogger('codediff')
 
@@ -29,28 +29,27 @@ class FileParser:
         return report
 
 
-def parsefiles(parsed_paths):
-    files = {}
-    for i, path1 in enumerate(parsed_paths):
-        parsed_file1 = FileParser(path1).parse()
-        for path2 in parsed_paths[i+1:]:
-            files[Pair(path1, path2)] = Pair(parsed_file1, FileParser(path2).parse())
-    return files
-
-
-def parsesnapfiles(parsed_paths):
+def _parsefiles(parsed_paths, parser_cls=None):
     files = {
         'succeeded': {},
         'failed': set()
     }
     for i, path1 in enumerate(parsed_paths):
         try:
-            parsed_file1 = SnapParser(path1).parse()
+            parsed_file1 = parser_cls(path1).parse()
             for path2 in parsed_paths[i+1:]:
-                files['succeeded'][Pair(path1, path2)] = Pair(parsed_file1, SnapParser(path2).parse())
+                files['succeeded'][Pair(path1, path2)] = Pair(parsed_file1, parser_cls(path2).parse())
         except ParseError as e:
             files['failed'] |= {e.filename}
     return files
+
+
+def parsefiles(parsed_paths):
+    return _parsefiles(parsed_paths, FileParser)
+
+
+def parsesnapfiles(parsed_paths):
+    return _parsefiles(parsed_paths, SnapParser)
 
 
 class SnapParser(FileParser):
@@ -96,13 +95,10 @@ class PathParser:
                 path = path.rstrip('/') # Will only work on unix, use os.path.normalpath for windows
                 file_paths = [root + '/' + x for root, _, files_list in os.walk(path) for x in files_list]
                 if self.validator:
-                    self.validator.validate_dir(file_paths)
-                paths += file_paths
+                    paths += self.validator.validate_dir(file_paths)
+               # paths += file_paths
             else:
                 raise FileNotFoundError('Could not find file {}. Aborting.'.format(path))
-
-        if len(paths) < 2:
-            raise NotEnoughFilesError('Expecting at least two xml files but found less than two.')
 
         _logger.debug('========== END `%s::%s::parse` ==========', __name__, self.__class__.__name__)
         return paths
