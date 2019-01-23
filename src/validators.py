@@ -64,3 +64,11 @@ class HtmlPathValidator(PathValidator):
 
     def validate_dir(self, file_paths):
         return self._find_files_by_extension(file_paths, '.html')
+
+class JavaPathValidator(PathValidator):
+    def validate_file(self, path):
+        self._validate_path_extension(path, '.java')
+        return path
+
+    def validate_dir(self, file_paths):
+        return self._find_files_by_extension(file_paths, '.java')

@@ -34,7 +34,7 @@ class SequenceMatcher(BaseMatcher):
         # for character_seq, character_seq_2 in zip(self.report1.content, self.report2.content):
         character_seq = self.report1.content
         character_seq_2 = self.report2.content
-        seq_match = difflib.SequenceMatcher(lambda x: x in " \t", character_seq, character_seq_2)
+        seq_match = difflib.SequenceMatcher(lambda x: x in " \t\n", character_seq, character_seq_2)
         diff_ratios.append(seq_match.quick_ratio())
 
         # The next line is where we would determine the actual diff ratio
